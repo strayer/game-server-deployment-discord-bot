@@ -209,7 +209,7 @@ gitdb = ">=4.0.1,<5"
 
 [[package]]
 name = "hikari"
-version = "2.0.0.dev108"
+version = "2.0.0.dev109"
 description = "A sane Discord API for Python 3 built on asyncio and good intentions"
 category = "main"
 optional = false
@@ -679,8 +679,8 @@ gitpython = [
     {file = "GitPython-3.1.27.tar.gz", hash = "sha256:1c885ce809e8ba2d88a29befeb385fcea06338d3640712b59ca623c220bb5704"},
 ]
 hikari = [
-    {file = "hikari-2.0.0.dev108-py3-none-any.whl", hash = "sha256:bc78e5c753f0b87ae24e1a644a2e4d01d08d5ed35cbaca0f160da5283a589785"},
-    {file = "hikari-2.0.0.dev108.tar.gz", hash = "sha256:d13cfcd0e3732185fa3048b5d9fd8b6078b5dbb0df7820ba7e3e55083bf9d4b5"},
+    {file = "hikari-2.0.0.dev109-py3-none-any.whl", hash = "sha256:8897055001605d987ea3ddba9c9ba546d34f18bcee7710073abb601e114faca4"},
+    {file = "hikari-2.0.0.dev109.tar.gz", hash = "sha256:03ed0685e7fc703d742334a103e9db62b57fd011e28521ccdb17149e6e37cd90"},
 ]
 hikari-lightbulb = [
     {file = "hikari-lightbulb-2.2.1.tar.gz", hash = "sha256:77c543dfec286b21ce4382bb5ede7a3106bbcab5ae43f41a1dc921b5e2e7e3af"},
