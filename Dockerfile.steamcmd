@@ -1,4 +1,4 @@
-FROM debian:11 AS steamcmd
+FROM debian:12 AS steamcmd
 
 RUN apt-get update && apt-get full-upgrade -y && rm -rv /var/lib/apt/lists
 
