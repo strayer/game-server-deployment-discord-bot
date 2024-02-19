@@ -19,7 +19,7 @@ requests = "^2.31.0"
 
 [tool.poetry.dev-dependencies]
 black = "^23.1a1"
-pylint = "^2.12.2"
+pylint = "^3.0.0"
 bandit = "^1.7.1"
 
 [build-system]
