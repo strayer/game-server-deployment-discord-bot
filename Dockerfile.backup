@@ -1,4 +1,4 @@
-FROM alpine:3.18 AS download
+FROM alpine:3.19 AS download
 
 ARG RESTIC_VERSION=0.15.1
 ARG RESTIC_DOWNLOAD_BASE=https://github.com/restic/restic/releases/download/v${RESTIC_VERSION}/
@@ -15,7 +15,7 @@ RUN apk add --no-cache gpgv gpg gnupg-keyboxd dirmngr gpg-agent curl coreutils &
   chmod +x restic_${RESTIC_VERSION}_linux_amd64 && \
   mv restic_${RESTIC_VERSION}_linux_amd64 /usr/local/bin/restic
 
-FROM alpine:3.18
+FROM alpine:3.19
 
 RUN apk --no-cache upgrade
 
