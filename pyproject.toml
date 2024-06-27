@@ -16,7 +16,6 @@ sentry-sdk = {extras = ["rq"], version = "^2.0.0"}
 docker = "^7.0.0"
 backoff = "^2.2.1"
 requests = "^2.32.0"
-cyclopts = "^2.7.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
