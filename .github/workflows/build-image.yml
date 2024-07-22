@@ -28,14 +28,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build job-runner container image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           push: true
           target: runtime-job-runner
           tags: |
             ghcr.io/strayer/game-server-deployment-discord-bot/job-runner:latest
       - name: Build discord-bot container image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           push: true
           provenance: false
@@ -43,7 +43,7 @@ jobs:
           tags: |
             ghcr.io/strayer/game-server-deployment-discord-bot/discord-bot:latest
       - name: Build server-launch-watcher container image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           push: true
           provenance: false
@@ -51,7 +51,7 @@ jobs:
           tags: |
             ghcr.io/strayer/game-server-deployment-discord-bot/server-launch-watcher:latest
       - name: Build valheim container image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           push: true
           provenance: false
@@ -60,7 +60,7 @@ jobs:
           tags: |
             ghcr.io/strayer/game-server-deployment-discord-bot/valheim:latest
       - name: Build backup container image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           push: true
           provenance: false
