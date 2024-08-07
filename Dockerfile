@@ -1,4 +1,4 @@
-FROM python:3.11.1 as build
+FROM python:3.12.5 as build
 
 ENV PYTHONFAULTHANDLER=1 \
   PYTHONUNBUFFERED=1 \
@@ -27,7 +27,7 @@ COPY discord_bot/ ./discord_bot/
 # prepend poetry and venv to path
 ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:$PATH"
 
-FROM python:3.11.1-slim AS runtime-discord-bot
+FROM python:3.12.5-slim AS runtime-discord-bot
 
 WORKDIR /app
 
@@ -36,7 +36,7 @@ COPY --from=build /app/ /app/
 
 CMD [ "python", "-m", "discord_bot.bot" ]
 
-FROM python:3.11.1-slim AS runtime-job-runner
+FROM python:3.12.5-slim AS runtime-job-runner
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -80,7 +80,7 @@ ENTRYPOINT [ "/app/terraform/terraform-entrypoint.sh" ]
 
 CMD [ "rq", "worker", "-c", "discord_bot.sentry", "--with-scheduler" ]
 
-FROM python:3.11.1-slim AS runtime-server-launch-watcher
+FROM python:3.12.5-slim AS runtime-server-launch-watcher
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
