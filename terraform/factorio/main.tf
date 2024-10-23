@@ -74,22 +74,6 @@ variable "ssh_pubkey" {
   sensitive = true
 }
 
-variable "game_persona_bot_name" {
-  type = string
-}
-
-variable "game_persona_bot_avatar_url" {
-  type = string
-}
-
-variable "bot_server_started_message" {
-  type = string
-}
-
-variable "bot_server_ready_message" {
-  type = string
-}
-
 # Configure the Hetzner Cloud Provider
 provider "hcloud" {
   token = var.hcloud_token
@@ -182,8 +166,8 @@ data "hcloud_image" "debian-12" {
 resource "hcloud_server" "factorio-server" {
   name        = "factorio-server"
   image       = data.hcloud_image.debian-12.id
-  server_type = "ccx23"
-  location    = "fsn1"
+  server_type = "ccx13"
+  location    = "nbg1"
 
   ssh_keys     = data.hcloud_ssh_keys.all_keys.ssh_keys.*.name
   firewall_ids = [hcloud_firewall.factorio-firewall.id]
@@ -194,10 +178,6 @@ resource "hcloud_server" "factorio-server" {
     restic_factorio_aws_secret_access_key = var.restic_factorio_aws_secret_access_key,
     factorio_save_name                    = var.factorio_save_name,
     factorio_discord_channel_webhook      = var.factorio_discord_channel_webhook
-    game_persona_bot_name                 = var.game_persona_bot_name,
-    game_persona_bot_avatar_url           = var.game_persona_bot_avatar_url,
-    bot_server_started_message            = var.bot_server_started_message,
-    bot_server_ready_message              = var.bot_server_ready_message,
   })
 }
 
