@@ -14,12 +14,12 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
   --mount=type=bind,source=uv.lock,target=uv.lock \
   --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-  uv sync --frozen --no-install-project --no-editable
+  uv sync --frozen --no-install-project
 
 COPY discord_bot/ ./discord_bot/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-  uv sync --frozen --no-editable
+  uv sync --frozen
 
 # ==========================================
 # Stage: Runtime Discord Bot
