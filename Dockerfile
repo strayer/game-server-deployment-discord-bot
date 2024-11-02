@@ -1,41 +1,42 @@
-FROM python:3.11.1 as build
+# ==========================================
+# Stage: Build
+# ==========================================
+FROM python:3.11.1 AS build
 
-ENV PYTHONFAULTHANDLER=1 \
-  PYTHONUNBUFFERED=1 \
-  PYTHONHASHSEED=random \
-  PIP_NO_CACHE_DIR=off \
-  PIP_DISABLE_PIP_VERSION_CHECK=on \
-  PIP_DEFAULT_TIMEOUT=100 \
-  POETRY_NO_INTERACTION=1 \
-  POETRY_VIRTUALENVS_CREATE=false \
-  PATH="$PATH:/runtime/bin" \
-  PYTHONPATH="$PYTHONPATH:/runtime/lib/python3.11/site-packages" \
-  # Versions:
-  POETRY_VERSION=1.2.2
+ENV UV_LINK_MODE=copy
 
-RUN pip install "poetry==$POETRY_VERSION"
+COPY --from=ghcr.io/astral-sh/uv:0.4.28 /uv /bin/uv
 
 WORKDIR /app
 
-COPY pyproject.toml poetry.lock ./
+COPY pyproject.toml uv.lock ./
 
-RUN poetry export --without-hashes --no-interaction --no-ansi -f requirements.txt -o requirements.txt && \
-  pip install --prefix=/runtime --force-reinstall -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/uv \
+  --mount=type=bind,source=uv.lock,target=uv.lock \
+  --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+  uv sync --frozen --no-install-project --no-editable
 
 COPY discord_bot/ ./discord_bot/
 
-# prepend poetry and venv to path
-ENV PATH="$POETRY_HOME/bin:$VENV_PATH/bin:$PATH"
+RUN --mount=type=cache,target=/root/.cache/uv \
+  uv sync --frozen --no-editable
 
+# ==========================================
+# Stage: Runtime Discord Bot
+# ==========================================
 FROM python:3.11.1-slim AS runtime-discord-bot
 
 WORKDIR /app
 
-COPY --from=build /runtime /usr/local
-COPY --from=build /app/ /app/
+ENV PATH="/app/.venv/bin:$PATH"
+
+COPY --from=build --chown=app:app /app/.venv /app/.venv
 
 CMD [ "python", "-m", "discord_bot.bot" ]
 
+# ==========================================
+# Stage: Runtime Job Runner
+# ==========================================
 FROM python:3.11.1-slim AS runtime-job-runner
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -65,8 +66,9 @@ RUN apt-get update && \
 
 WORKDIR /app
 
-COPY --from=build /runtime /usr/local
-COPY --from=build /app/ /app/
+COPY --from=build --chown=app:app /app/.venv /app/.venv
+
+ENV PATH="/app/.venv/bin:$PATH"
 
 COPY scripts/ /app/scripts/
 COPY terraform/terraform-entrypoint.sh /app/terraform/
@@ -80,13 +82,17 @@ ENTRYPOINT [ "/app/terraform/terraform-entrypoint.sh" ]
 
 CMD [ "rq", "worker", "-c", "discord_bot.sentry", "--with-scheduler" ]
 
+# ==========================================
+# Stage: Runtime Server Launch Watcher
+# ==========================================
 FROM python:3.11.1-slim AS runtime-server-launch-watcher
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 WORKDIR /app
 
-COPY --from=build /runtime /usr/local
-COPY --from=build /app/ /app/
+COPY --from=build --chown=app:app /app/.venv /app/.venv
+
+ENV PATH="/app/.venv/bin:$PATH"
 
 CMD [ "python", "-m", "discord_bot.server_launch_watcher" ]
