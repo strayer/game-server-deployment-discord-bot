@@ -5,7 +5,7 @@ FROM python:3.11.1 AS build
 
 ENV UV_LINK_MODE=copy
 
-COPY --from=ghcr.io/astral-sh/uv:0.4.28 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.4.29 /uv /bin/uv
 
 WORKDIR /app
 
