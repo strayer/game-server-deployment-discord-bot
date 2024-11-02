@@ -10,7 +10,7 @@ python = "^3.11,<3.12"
 loguru = "^0.7.0"
 hikari = "^2.0.0.dev113"
 hikari-lightbulb = "^2.3.0"
-rq = "^1.10.1"
+rq = "^2.0.0"
 openai = "^1.12.0"
 sentry-sdk = {extras = ["rq"], version = "^2.8.0"}
 docker = "^7.0.0"
