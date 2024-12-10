@@ -12,7 +12,7 @@ hikari = "^2.0.0.dev113"
 hikari-lightbulb = "^2.3.0"
 rq = "^1.10.1"
 openai = "^1.12.0"
-sentry-sdk = {extras = ["rq"], version = "^2.8.0"}
+sentry-sdk = {extras = ["rq"], version = "^2.0.0"}
 docker = "^7.0.0"
 backoff = "^2.2.1"
 requests = "^2.32.0"
