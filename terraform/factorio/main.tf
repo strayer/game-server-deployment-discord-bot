@@ -1,12 +1,14 @@
 terraform {
+  required_version = "1.10.5"
+
   required_providers {
     hcloud = {
       source  = "hetznercloud/hcloud"
-      version = "1.47.0"
+      version = "1.49.1"
     }
     cloudflare = {
       source  = "cloudflare/cloudflare"
-      version = "~> 4.0"
+      version = "5.0.0"
     }
   }
 
@@ -20,9 +22,11 @@ terraform {
     key = "factorio"
 
     skip_credentials_validation = true
+    skip_requesting_account_id  = true
     skip_metadata_api_check     = true
     skip_region_validation      = true
-    force_path_style            = true
+    skip_s3_checksum            = true
+    use_path_style              = true
   }
 }
 
@@ -40,6 +44,14 @@ variable "cloudflare_api_key" {
 
 variable "zone_name" {
   sensitive = true
+}
+
+data "cloudflare_zones" "search" {
+  name = var.zone_name
+}
+
+data "cloudflare_zone" "zone" {
+  zone_id = data.cloudflare_zones.search.result.0.id
 }
 
 variable "factorio_server_subdomain" {
@@ -92,22 +104,19 @@ provider "cloudflare" {
   api_key = var.cloudflare_api_key
 }
 
-data "cloudflare_zone" "zone" {
-  name = var.zone_name
-}
 
-resource "cloudflare_record" "factorio_server_ipv4" {
+resource "cloudflare_dns_record" "factorio_server_ipv4" {
   zone_id = data.cloudflare_zone.zone.zone_id
   name    = var.factorio_server_subdomain
-  value   = hcloud_server.factorio-server.ipv4_address
+  content = hcloud_server.factorio-server.ipv4_address
   type    = "A"
   ttl     = 60
 }
 
-resource "cloudflare_record" "factorio_server_ipv6" {
+resource "cloudflare_dns_record" "factorio_server_ipv6" {
   zone_id = data.cloudflare_zone.zone.zone_id
   name    = var.factorio_server_subdomain
-  value   = hcloud_server.factorio-server.ipv6_address
+  content = hcloud_server.factorio-server.ipv6_address
   type    = "AAAA"
   ttl     = 60
 }
@@ -194,7 +203,7 @@ resource "hcloud_server" "factorio-server" {
 resource "hcloud_rdns" "factorio-server-ipv4" {
   server_id  = hcloud_server.factorio-server.id
   ip_address = hcloud_server.factorio-server.ipv4_address
-  dns_ptr    = cloudflare_record.factorio_server_ipv4.hostname
+  dns_ptr    = "${var.factorio_server_subdomain}.${var.zone_name}"
 }
 
 output "server_ip" { value = hcloud_server.factorio-server.ipv4_address }

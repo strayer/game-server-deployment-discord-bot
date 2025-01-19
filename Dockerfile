@@ -48,7 +48,7 @@ ENV \
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 # Install terraform
-ARG TERRAFORM_VERSION=1.3.6
+ARG TERRAFORM_VERSION=1.10.5
 RUN export PACKAGES="curl gnupg libdigest-sha-perl unzip" && \
   export TERRAFORM_ARCH="$(arch | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)" && \
   apt-get update && apt-get install --no-install-recommends -y $PACKAGES  && \
@@ -80,6 +80,7 @@ COPY terraform/terraform-entrypoint.sh /app/terraform/
 
 COPY terraform/valheim/main.tf terraform/valheim/.terraform.lock.hcl terraform/valheim/cloud-init.tftpl /app/terraform/valheim/
 COPY terraform/factorio/main.tf terraform/factorio/.terraform.lock.hcl terraform/factorio/cloud-init.tftpl /app/terraform/factorio/
+COPY terraform/enshrouded/main.tf terraform/enshrouded/.terraform.lock.hcl terraform/enshrouded/cloud-init.tftpl /app/terraform/enshrouded/
 
 ENV TF_DATA_DIR_BASE=/terraform/init
 

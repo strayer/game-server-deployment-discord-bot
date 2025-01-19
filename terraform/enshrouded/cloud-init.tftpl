@@ -84,11 +84,11 @@ write_files:
   - owner: root:root
     path: /env-backup
     content: |
-      RESTIC_REPOSITORY=${ restic_valheim_repo }
-      RESTIC_PASSWORD=${ restic_valheim_password }
-      AWS_ACCESS_KEY_ID=${ restic_valheim_aws_access_key_id }
-      AWS_SECRET_ACCESS_KEY=${ restic_valheim_aws_secret_access_key }
-      GAME_NAME=valheim
+      RESTIC_REPOSITORY=${ restic_enshrouded_repo }
+      RESTIC_PASSWORD=${ restic_enshrouded_password }
+      AWS_ACCESS_KEY_ID=${ restic_enshrouded_aws_access_key_id }
+      AWS_SECRET_ACCESS_KEY=${ restic_enshrouded_aws_secret_access_key }
+      GAME_NAME=enshrouded
       GAMEDATA_PATH=/gamedata
     permissions: '0600'
   - owner: root:root
@@ -107,7 +107,7 @@ write_files:
         -H "Content-Type: application/json" \
         -X POST \
         --data "$json_message" \
-        "${ valheim_discord_channel_webhook }"
+        "${ enshrouded_discord_channel_webhook }"
 
 packages:
   - docker-ce
@@ -119,12 +119,12 @@ packages:
   - jq
 
 runcmd:
-  - docker pull ghcr.io/strayer/game-server-deployment-discord-bot/valheim:latest
+  - docker pull ghcr.io/strayer/game-server-deployment-discord-bot/enshrouded:latest
   - docker pull ghcr.io/strayer/game-server-deployment-discord-bot/backup:latest
   - docker pull ghcr.io/strayer/game-server-deployment-discord-bot/server-launch-watcher:latest
   - docker volume create steamcmd
   - docker volume create steam
-  - docker volume create valheim
+  - docker volume create enshrouded
   - mkdir /gamedata
   - chown -R 1000 /gamedata
   - |
@@ -139,20 +139,19 @@ runcmd:
       docker run -d --read-only --network=host \
         -v steamcmd:/opt/steamcmd \
         -v steam:/home/steam \
-        -v valheim:/opt/valheim \
+        -v enshrouded:/opt/enshrouded \
         -v /gamedata:/gamedata \
         --tmpfs /tmp:uid=1000 \
-        -e VALHEIM_SERVER_NAME=${ valheim_server_name } \
-        -e VALHEIM_SERVER_WORLD=${ valheim_server_world } \
-        -e VALHEIM_SERVER_PASSWORD=${ valheim_server_password } \
-        -e DISCORD_MAIN_CHANNEL_WEBHOOK=${ valheim_discord_channel_webhook } \
-        --name valheim-server \
-        ghcr.io/strayer/game-server-deployment-discord-bot/valheim:latest
+        -e "SERVER_NAME=${ enshrouded_server_name }" \
+        -e "SERVER_PASSWORD=${ enshrouded_server_password }" \
+        -e "DISCORD_MAIN_CHANNEL_WEBHOOK=${ enshrouded_discord_channel_webhook }" \
+        --name enshrouded-server \
+        ghcr.io/strayer/game-server-deployment-discord-bot/enshrouded:latest
   - |
       docker run -d --read-only --network=host \
         -v /var/run/docker.sock:/var/run/docker.sock:ro \
-        -e GAME_NAME=valheim \
-        -e DISCORD_WEBHOOK=${ valheim_discord_channel_webhook } \
+        -e GAME_NAME=enshrouded \
+        -e DISCORD_WEBHOOK=${ enshrouded_discord_channel_webhook } \
         -e SERVER_READY_MESSAGE="${ bot_server_ready_message }" \
         --name server-launch-watcher \
         ghcr.io/strayer/game-server-deployment-discord-bot/server-launch-watcher:latest
