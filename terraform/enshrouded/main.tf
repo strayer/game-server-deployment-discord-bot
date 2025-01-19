@@ -19,7 +19,7 @@ terraform {
     # set secret_access_key via AWS_SECRET_ACCESS_KEY env
     # set bucket via terraform init -backend-config="bucket=..." CLI option
 
-    key = "valheim"
+    key = "enshrouded"
 
     skip_credentials_validation = true
     skip_requesting_account_id  = true
@@ -46,8 +46,7 @@ variable "cloudflare_api_key" {
 }
 
 variable "zone_name" {
-  type      = string
-  sensitive = true
+  type = string
 }
 
 data "cloudflare_zones" "search" {
@@ -58,47 +57,38 @@ data "cloudflare_zone" "zone" {
   zone_id = data.cloudflare_zones.search.result.0.id
 }
 
-variable "valheim_server_subdomain" {
+variable "enshrouded_server_subdomain" {
+  type = string
+}
+
+variable "restic_enshrouded_repo" {
+  type = string
+}
+
+variable "restic_enshrouded_password" {
   type      = string
   sensitive = true
 }
 
-variable "restic_valheim_repo" {
+variable "restic_enshrouded_aws_access_key_id" {
+  type = string
+}
+
+variable "restic_enshrouded_aws_secret_access_key" {
   type      = string
   sensitive = true
 }
 
-variable "restic_valheim_password" {
+variable "enshrouded_server_name" {
+  type = string
+}
+
+variable "enshrouded_server_password" {
   type      = string
   sensitive = true
 }
 
-variable "restic_valheim_aws_access_key_id" {
-  type      = string
-  sensitive = true
-}
-
-variable "restic_valheim_aws_secret_access_key" {
-  type      = string
-  sensitive = true
-}
-
-variable "valheim_server_name" {
-  type      = string
-  sensitive = true
-}
-
-variable "valheim_server_world" {
-  type      = string
-  sensitive = true
-}
-
-variable "valheim_server_password" {
-  type      = string
-  sensitive = true
-}
-
-variable "valheim_discord_channel_webhook" {
+variable "enshrouded_discord_channel_webhook" {
   type      = string
   sensitive = true
 }
@@ -127,24 +117,25 @@ provider "cloudflare" {
 }
 
 
-resource "cloudflare_dns_record" "valheim_server_ipv4" {
+resource "cloudflare_dns_record" "enshrouded_server_ipv4" {
   zone_id = data.cloudflare_zone.zone.zone_id
-  name    = var.valheim_server_subdomain
-  content = hcloud_server.valheim-server.ipv4_address
+  name    = var.enshrouded_server_subdomain
+  content = hcloud_server.enshrouded-server.ipv4_address
   type    = "A"
   ttl     = 60
 }
 
-resource "cloudflare_dns_record" "valheim_server_ipv6" {
-  zone_id = data.cloudflare_zone.zone.zone_id
-  name    = var.valheim_server_subdomain
-  content = hcloud_server.valheim-server.ipv6_address
-  type    = "AAAA"
-  ttl     = 60
-}
+# At time of writing Enshrouded does not support IPv6
+# resource "cloudflare_dns_record" "enshrouded_server_ipv6" {
+#   zone_id = data.cloudflare_zone.zone.zone_id
+#   name    = var.enshrouded_server_subdomain
+#   content = hcloud_server.enshrouded-server.ipv6_address
+#   type    = "AAAA"
+#   ttl     = 60
+# }
 
 resource "hcloud_ssh_key" "discord_bot" {
-  name       = "valheim-discord-bot"
+  name       = "enshrouded-discord-bot"
   public_key = var.ssh_pubkey
 }
 
@@ -154,8 +145,8 @@ data "hcloud_ssh_keys" "all_keys" {
   ]
 }
 
-resource "hcloud_firewall" "valheim-firewall" {
-  name = "valheim-firewall"
+resource "hcloud_firewall" "enshrouded-firewall" {
+  name = "enshrouded-firewall"
 
   rule {
     direction = "in"
@@ -179,7 +170,17 @@ resource "hcloud_firewall" "valheim-firewall" {
   rule {
     direction = "in"
     protocol  = "udp"
-    port      = "2456-2457"
+    port      = "15636-15637"
+    source_ips = [
+      "0.0.0.0/0",
+      "::/0"
+    ]
+  }
+
+  rule {
+    direction = "in"
+    protocol  = "tcp"
+    port      = "15636-15637"
     source_ips = [
       "0.0.0.0/0",
       "::/0"
@@ -192,32 +193,31 @@ data "hcloud_image" "debian-12" {
   with_architecture = "x86"
 }
 
-resource "hcloud_server" "valheim-server" {
-  name        = "valheim-server"
+resource "hcloud_server" "enshrouded-server" {
+  name        = "enshrouded-server"
   image       = data.hcloud_image.debian-12.id
   server_type = "ccx23"
   location    = "nbg1"
 
   ssh_keys     = data.hcloud_ssh_keys.all_keys.ssh_keys.*.name
-  firewall_ids = [hcloud_firewall.valheim-firewall.id]
+  firewall_ids = [hcloud_firewall.enshrouded-firewall.id]
   user_data = templatefile("${path.module}/cloud-init.tftpl", {
-    restic_valheim_repo                  = var.restic_valheim_repo,
-    restic_valheim_password              = var.restic_valheim_password,
-    restic_valheim_aws_access_key_id     = var.restic_valheim_aws_access_key_id,
-    restic_valheim_aws_secret_access_key = var.restic_valheim_aws_secret_access_key,
-    valheim_server_name                  = var.valheim_server_name,
-    valheim_server_world                 = var.valheim_server_world,
-    valheim_server_password              = var.valheim_server_password,
-    valheim_discord_channel_webhook      = var.valheim_discord_channel_webhook
-    bot_server_started_message           = var.bot_server_started_message,
-    bot_server_ready_message             = var.bot_server_ready_message,
+    restic_enshrouded_repo                  = var.restic_enshrouded_repo,
+    restic_enshrouded_password              = var.restic_enshrouded_password,
+    restic_enshrouded_aws_access_key_id     = var.restic_enshrouded_aws_access_key_id,
+    restic_enshrouded_aws_secret_access_key = var.restic_enshrouded_aws_secret_access_key,
+    enshrouded_server_name                  = var.enshrouded_server_name,
+    enshrouded_server_password              = var.enshrouded_server_password,
+    enshrouded_discord_channel_webhook      = var.enshrouded_discord_channel_webhook
+    bot_server_started_message              = var.bot_server_started_message,
+    bot_server_ready_message                = var.bot_server_ready_message,
   })
 }
 
-resource "hcloud_rdns" "valheim-server-ipv4" {
-  server_id  = hcloud_server.valheim-server.id
-  ip_address = hcloud_server.valheim-server.ipv4_address
-  dns_ptr    = "${var.valheim_server_subdomain}.${var.zone_name}"
+resource "hcloud_rdns" "enshrouded-server-ipv4" {
+  server_id  = hcloud_server.enshrouded-server.id
+  ip_address = hcloud_server.enshrouded-server.ipv4_address
+  dns_ptr    = "${var.enshrouded_server_subdomain}.${var.zone_name}"
 }
 
-output "server_ip" { value = hcloud_server.valheim-server.ipv4_address }
+output "server_ip" { value = hcloud_server.enshrouded-server.ipv4_address }

@@ -6,29 +6,38 @@ ENV LC_ALL=en_US.UTF-8
 ENV LANG=en_US.UTF-8
 
 RUN apt-get update && \
-  apt-get install -y locales && \
+  apt-get install --no-install-recommends -y locales && \
   rm -rf /var/lib/apt/lists && \
   sed -i "/$LANG/s/^# //g" /etc/locale.gen && \
   locale-gen && \
   rm -rf /var/lib/apt/lists
 
-# dig & bind9-dnsutils (dig) for Discord webhooks
-RUN apt-get update && \
+RUN dpkg --add-architecture i386 && \
+  apt-get update && \
   apt-get install --no-install-recommends -y \
   lib32gcc-s1 curl ca-certificates \
   jq bind9-dnsutils \
+  winbind dbus libfreetype6 procps \
   && \
   rm -rf /var/lib/apt/lists
 
+RUN rm -f /etc/machine-id /var/lib/dbus/machine-id && \
+  dbus-uuidgen --ensure=/etc/machine-id && \
+  dbus-uuidgen --ensure
+
 ENV STEAMCMD_PATH=/opt/steamcmd
 ENV GAMEDATA_PATH=/gamedata
+ENV STEAM_SDK64_PATH="/home/steam/.steam/sdk64"
+ENV STEAM_SDK32_PATH="/home/steam/.steam/sdk32"
+ENV STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAMCMD_PATH"
+ENV WINEDEBUG=-all
+ENV USE_PROTON=0
 
 RUN useradd -u 1000 -m steam && \
   mkdir -p /home/steam/Steam/logs/ && \
   ln -s /dev/stdout /home/steam/Steam/logs/stderr.txt
 
 COPY docker/install-steamcmd.sh \
-  docker/update-steamcmd.sh \
   docker/install-or-update-game.sh \
   docker/entrypoint.sh \
   /opt/bin/
@@ -52,6 +61,10 @@ ENV GAME_NAME=valheim
 ENV GAME_DISPLAY_NAME=Valheim
 ENV GAME_PATH=/opt/valheim
 
+USER root
+RUN mkdir -p "$GAME_PATH" && chown steam:steam "$GAME_PATH"
+USER steam
+
 COPY docker/valheim/start.sh /opt/bin/start-valheim.sh
 
 RUN mkdir -p /home/steam/.config/unity3d/IronGate/ && ln -s "$GAMEDATA_PATH" /home/steam/.config/unity3d/IronGate/Valheim
@@ -61,3 +74,36 @@ WORKDIR $GAME_PATH
 STOPSIGNAL SIGINT
 
 CMD [ "/opt/bin/start-valheim.sh" ]
+
+#
+# Enshrouded
+#
+
+FROM steamcmd AS enshrouded
+
+ENV STEAMAPPID=2278520
+ENV GAME_NAME=enshrouded
+ENV GAME_DISPLAY_NAME=Enshrouded
+ENV GAME_PATH=/opt/enshrouded
+
+ENV USE_PROTON=1
+ENV PROTON_VERSION="9-18"
+ENV STEAM_COMPAT_DATA_PATH="${STEAMCMD_PATH}/steamapps/compatdata/${STEAMAPPID}"
+
+USER root
+
+RUN mkdir -p "$GAME_PATH" && chown steam:steam "$GAME_PATH"
+
+COPY docker/enshrouded/start.sh /opt/bin/start-enshrouded.sh
+COPY docker/enshrouded/enshrouded_server_example.json "/opt/enshrouded_server_example.json"
+
+# set up logging
+RUN mkdir -p "/logs" && \
+  ln -sf /proc/1/fd/1 "/logs/enshrouded_server.log" && \
+  chown -R steam:steam "/logs"
+
+USER steam
+
+WORKDIR $GAME_PATH
+
+CMD [ "/opt/bin/start-enshrouded.sh" ]

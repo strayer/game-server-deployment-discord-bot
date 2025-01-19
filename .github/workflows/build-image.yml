@@ -73,6 +73,17 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Build enshrouded container image
+        uses: docker/build-push-action@v6
+        with:
+          push: ${{ github.event_name != 'pull_request' }}
+          target: enshrouded
+          file: Dockerfile.steamcmd
+          tags: |
+            ghcr.io/strayer/game-server-deployment-discord-bot/enshrouded:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Build backup container image
         uses: docker/build-push-action@v6
         with:

@@ -31,6 +31,9 @@ if GAME_NAME == "valheim":
 elif GAME_NAME == "factorio":
     CONTAINER_NAME = "factorio-server"
     REGEX_PATTERN = r"changing state from\(CreatingGame\) to\(InGame\)"
+elif GAME_NAME == "enshrouded":
+    CONTAINER_NAME = "enshrouded-server"
+    REGEX_PATTERN = r"\[Session\] 'HostOnline' \(up\)!"
 elif GAME_NAME is None or GAME_NAME == "":
     logger.error("GAME_NAME environment variable required to function")
     sys.exit(-1)
@@ -49,7 +52,12 @@ class ServerAddresses:
     domain: str | None
 
     def __str__(self) -> str:
-        ip_part = self.ipv4 if self.ipv6 is None else f"{self.ipv4}, {self.ipv6}"
+        # At time of writing Enshrouded does not support IPv6
+        ip_part = (
+            self.ipv4
+            if self.ipv6 is None or GAME_NAME == "enshrouded"
+            else f"{self.ipv4}, {self.ipv6}"
+        )
 
         if self.domain is None:
             return ip_part

@@ -1,10 +1,10 @@
 import os
-from rq import Queue
-from loguru import logger
+
 import redis
-from discord_bot import valheim_server
-from discord_bot import factorio_server
-from discord_bot import db
+from loguru import logger
+from rq import Queue
+
+from discord_bot import db, games
 
 _QUEUE = None
 
@@ -18,37 +18,43 @@ def get_queue() -> Queue:
     return _QUEUE
 
 
-def start_valheim_server(
-    bot_message_server_started: str, bot_message_server_ready: str
-) -> None:
-    with db.get_redis().lock("valheim_server"):
-        logger.info("Starting Valheim server")
-        valheim_server.start_server(
-            bot_message_server_started, bot_message_server_ready
-        )
-        logger.info("Finished starting Valheim server")
+def start_server(game: games.Game) -> None:
+    lock_name = f"{game.game_name}_server"
+
+    with db.get_redis().lock(lock_name):
+        logger.info(f"Starting {game.game_display_name} server")
+        game.start_server()
+        logger.info(f"Finished starting {game.game_display_name} server")
 
 
-def stop_valheim_server(bot_message_started: str, bot_message_finished: str) -> None:
-    with db.get_redis().lock("valheim_server"):
-        logger.info("Stopping Valheim server")
-        valheim_server.stop_server(bot_message_started, bot_message_finished)
-        logger.info("Finished stopping Valheim server")
+def stop_server(game: games.Game) -> None:
+    lock_name = f"{game.game_name}_server"
+
+    with db.get_redis().lock(lock_name):
+        logger.info(f"Stopping {game.game_display_name} server")
+        game.stop_server()
+        logger.info(f"Finished stopping {game.game_display_name} server")
 
 
-def start_factorio_server(
-    bot_message_server_started: str, bot_message_server_ready: str
-) -> None:
-    with db.get_redis().lock("factorio_server"):
-        logger.info("Starting Factorio server")
-        factorio_server.start_server(
-            bot_message_server_started, bot_message_server_ready
-        )
-        logger.info("Finished starting Factorio server")
+def start_valheim_server() -> None:
+    start_server(game=games.VALHEIM)
 
 
-def stop_factorio_server(bot_message_started: str, bot_message_finished: str) -> None:
-    with db.get_redis().lock("factorio_server"):
-        logger.info("Stopping Factorio server")
-        factorio_server.stop_server(bot_message_started, bot_message_finished)
-        logger.info("Finished stopping Factorio server")
+def stop_valheim_server() -> None:
+    stop_server(game=games.VALHEIM)
+
+
+def start_factorio_server() -> None:
+    start_server(game=games.FACTORIO)
+
+
+def stop_factorio_server() -> None:
+    stop_server(game=games.FACTORIO)
+
+
+def start_enshrouded_server() -> None:
+    start_server(game=games.ENSHROUDED)
+
+
+def stop_enshrouded_server() -> None:
+    stop_server(game=games.ENSHROUDED)

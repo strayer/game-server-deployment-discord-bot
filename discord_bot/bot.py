@@ -62,12 +62,7 @@ async def cooldown(ctx: lightbulb.SlashContext, seconds: int) -> bool:
             ttl=ttl,
         )
 
-        await ctx.respond(
-            str.format(
-                f"ERROR: This command is on cooldown! Please retry later. ({ttl}s left)",
-                seconds=ttl,
-            )
-        )
+        await ctx.respond(f"ERROR: This command is on cooldown! Please retry later. ({ttl}s left)")
         return False
 
     db.set_cooldown(ctx.command.name, seconds)
@@ -92,11 +87,7 @@ async def start_valheim(ctx: lightbulb.SlashContext) -> None:
 
     await ctx.respond("Valheim start trigger received, this may take a few minutes")
 
-    server_started_response = "Valheim has been installed and save state backup restored, starting game server..."
-    server_ready_response = "Valheim server is ready!"
-    jobs.get_queue().enqueue(
-        jobs.start_valheim_server, server_started_response, server_ready_response
-    )
+    jobs.get_queue().enqueue(jobs.start_valheim_server)
 
 
 @bot.command
@@ -117,13 +108,7 @@ async def stop_valheim(ctx: lightbulb.SlashContext) -> None:
 
     await ctx.respond("Server stop trigger received, this may take a few minutes")
 
-    server_stopping_response = "Valheim is shutting down..."
-    stop_finished_response = (
-        "Valheim server has been destroyed and world backed up 🧨💥"
-    )
-    jobs.get_queue().enqueue(
-        jobs.stop_valheim_server, server_stopping_response, stop_finished_response
-    )
+    jobs.get_queue().enqueue(jobs.stop_valheim_server)
 
 
 @bot.command
@@ -144,11 +129,7 @@ async def start_factorio(ctx: lightbulb.SlashContext) -> None:
 
     await ctx.respond("Factorio start trigger received, this may take a few minutes")
 
-    server_started_response = "Factorio has been installed and save state backup restored, starting game server..."
-    server_ready_response = "Factorio server is ready!"
-    jobs.get_queue().enqueue(
-        jobs.start_factorio_server, server_started_response, server_ready_response
-    )
+    jobs.get_queue().enqueue(jobs.start_factorio_server)
 
 
 @bot.command
@@ -169,13 +150,49 @@ async def stop_factorio(ctx: lightbulb.SlashContext) -> None:
 
     await ctx.respond("Server stop trigger received, this may take a few minutes")
 
-    server_stopping_response = "Factorio is shutting down..."
-    stop_finished_response = (
-        "Factorio server has been destroyed and savegame backed up 🧨💥"
-    )
-    jobs.get_queue().enqueue(
-        jobs.stop_factorio_server, server_stopping_response, stop_finished_response
-    )
+    jobs.get_queue().enqueue(jobs.stop_factorio_server)
+
+
+@bot.command
+@lightbulb.command(
+    f"{COMMAND_PREFIX}start-enshrouded",
+    "Starts the Enshrouded dedicated server.",
+    guilds=[GUILD_ID],
+    auto_defer=True,
+)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def start_enshrouded(ctx: lightbulb.SlashContext) -> None:
+    if not await authorize(ctx):
+        return
+    if not await cooldown(ctx, 60):
+        return
+
+    log_command(ctx)
+
+    await ctx.respond("Enshrouded start trigger received, this may take a few minutes")
+
+    jobs.get_queue().enqueue(jobs.start_enshrouded_server)
+
+
+@bot.command
+@lightbulb.command(
+    f"{COMMAND_PREFIX}stop-enshrouded",
+    "Stops the Enshrouded dedicated server.",
+    guilds=[GUILD_ID],
+    auto_defer=True,
+)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def stop_enshrouded(ctx: lightbulb.SlashContext) -> None:
+    if not await authorize(ctx):
+        return
+    if not await cooldown(ctx, 60):
+        return
+
+    log_command(ctx)
+
+    await ctx.respond("Server stop trigger received, this may take a few minutes")
+
+    jobs.get_queue().enqueue(jobs.stop_enshrouded_server)
 
 
 @bot.command
