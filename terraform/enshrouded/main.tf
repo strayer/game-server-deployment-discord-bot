@@ -106,6 +106,16 @@ variable "bot_server_ready_message" {
   type = string
 }
 
+variable "enshrouded_server_type" {
+  type    = string
+  default = "ccx23"
+}
+
+variable "enshrouded_location" {
+  type    = string
+  default = "nbg1"
+}
+
 # Configure the Hetzner Cloud Provider
 provider "hcloud" {
   token = var.hcloud_token
@@ -196,8 +206,8 @@ data "hcloud_image" "debian-12" {
 resource "hcloud_server" "enshrouded-server" {
   name        = "enshrouded-server"
   image       = data.hcloud_image.debian-12.id
-  server_type = "ccx23"
-  location    = "nbg1"
+  server_type = var.enshrouded_server_type
+  location    = var.enshrouded_location
 
   ssh_keys     = data.hcloud_ssh_keys.all_keys.ssh_keys.*.name
   firewall_ids = [hcloud_firewall.enshrouded-firewall.id]

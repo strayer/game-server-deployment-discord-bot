@@ -94,6 +94,16 @@ variable "bot_server_ready_message" {
   type = string
 }
 
+variable "factorio_server_type" {
+  type    = string
+  default = "ccx23"
+}
+
+variable "factorio_location" {
+  type    = string
+  default = "fsn1"
+}
+
 # Configure the Hetzner Cloud Provider
 provider "hcloud" {
   token = var.hcloud_token
@@ -183,8 +193,8 @@ data "hcloud_image" "debian-12" {
 resource "hcloud_server" "factorio-server" {
   name        = "factorio-server"
   image       = data.hcloud_image.debian-12.id
-  server_type = "ccx23"
-  location    = "fsn1"
+  server_type = var.factorio_server_type
+  location    = var.factorio_location
 
   ssh_keys     = data.hcloud_ssh_keys.all_keys.ssh_keys.*.name
   firewall_ids = [hcloud_firewall.factorio-firewall.id]
