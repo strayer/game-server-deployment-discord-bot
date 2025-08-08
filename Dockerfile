@@ -1,6 +1,6 @@
 FROM python:3.11.1 AS build
 
-COPY --from=ghcr.io/astral-sh/uv:0.8.6 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.8.7 /uv /bin/uv
 
 ENV PYTHONFAULTHANDLER=1 \
   PYTHONUNBUFFERED=1 \
