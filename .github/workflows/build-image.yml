@@ -14,12 +14,93 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
 
 jobs:
-  push_to_registry:
-    name: Push Docker image to GitHub Packages
+  # First stage: Build base stages in parallel
+  build-base-stages:
+    name: Build ${{ matrix.base.name }} base stage
     runs-on: ubuntu-latest
     permissions:
       packages: write
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        base:
+          - name: python-build
+            target: build
+            file: Dockerfile
+            cache-scope: python-build
+          
+          - name: steamcmd
+            target: steamcmd
+            file: Dockerfile.steamcmd
+            cache-scope: steamcmd
+    
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.base.name }} base stage
+        uses: docker/build-push-action@v6
+        with:
+          push: false
+          target: ${{ matrix.base.target }}
+          file: ${{ matrix.base.file }}
+          cache-from: type=gha,scope=${{ matrix.base.cache-scope }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.base.cache-scope }}
+
+  # Second stage: Build all final images in parallel, depending on base stages
+  build-final-images:
+    name: Build ${{ matrix.image.name }} image
+    needs: build-base-stages
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: job-runner
+            target: runtime-job-runner
+            file: Dockerfile
+            tags: ghcr.io/strayer/game-server-deployment-discord-bot/job-runner:latest
+            cache-scope: job-runner
+            base-cache-scope: python-build
+          
+          - name: discord-bot
+            target: runtime-discord-bot
+            file: Dockerfile
+            tags: ghcr.io/strayer/game-server-deployment-discord-bot/discord-bot:latest
+            cache-scope: discord-bot
+            base-cache-scope: python-build
+          
+          - name: server-launch-watcher
+            target: runtime-server-launch-watcher
+            file: Dockerfile
+            tags: ghcr.io/strayer/game-server-deployment-discord-bot/server-launch-watcher:latest
+            cache-scope: server-launch-watcher
+            base-cache-scope: python-build
+          
+          - name: valheim
+            target: valheim
+            file: Dockerfile.steamcmd
+            tags: ghcr.io/strayer/game-server-deployment-discord-bot/valheim:latest
+            cache-scope: valheim
+            base-cache-scope: steamcmd
+          
+          - name: enshrouded
+            target: enshrouded
+            file: Dockerfile.steamcmd
+            tags: ghcr.io/strayer/game-server-deployment-discord-bot/enshrouded:latest
+            cache-scope: enshrouded
+            base-cache-scope: steamcmd
+          
+          - name: backup
+            file: Dockerfile.backup
+            tags: ghcr.io/strayer/game-server-deployment-discord-bot/backup:latest
+            cache-scope: backup
+            # No base-cache-scope as this is independent
+    
     steps:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -32,64 +113,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build job-runner container image
+      - name: Build ${{ matrix.image.name }} container image
         uses: docker/build-push-action@v6
         with:
           push: ${{ github.event_name != 'pull_request' }}
-          target: runtime-job-runner
-          tags: |
-            ghcr.io/strayer/game-server-deployment-discord-bot/job-runner:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build discord-bot container image
-        uses: docker/build-push-action@v6
-        with:
-          push: ${{ github.event_name != 'pull_request' }}
-          target: runtime-discord-bot
-          tags: |
-            ghcr.io/strayer/game-server-deployment-discord-bot/discord-bot:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build server-launch-watcher container image
-        uses: docker/build-push-action@v6
-        with:
-          push: ${{ github.event_name != 'pull_request' }}
-          target: runtime-server-launch-watcher
-          tags: |
-            ghcr.io/strayer/game-server-deployment-discord-bot/server-launch-watcher:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build valheim container image
-        uses: docker/build-push-action@v6
-        with:
-          push: ${{ github.event_name != 'pull_request' }}
-          target: valheim
-          file: Dockerfile.steamcmd
-          tags: |
-            ghcr.io/strayer/game-server-deployment-discord-bot/valheim:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build enshrouded container image
-        uses: docker/build-push-action@v6
-        with:
-          push: ${{ github.event_name != 'pull_request' }}
-          target: enshrouded
-          file: Dockerfile.steamcmd
-          tags: |
-            ghcr.io/strayer/game-server-deployment-discord-bot/enshrouded:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build backup container image
-        uses: docker/build-push-action@v6
-        with:
-          push: ${{ github.event_name != 'pull_request' }}
-          file: Dockerfile.backup
-          tags: |
-            ghcr.io/strayer/game-server-deployment-discord-bot/backup:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          target: ${{ matrix.image.target }}
+          file: ${{ matrix.image.file }}
+          tags: ${{ matrix.image.tags }}
+          cache-from: |
+            type=gha,scope=${{ matrix.image.cache-scope }}
+            ${{ matrix.image.base-cache-scope && format('type=gha,scope={0}', matrix.image.base-cache-scope) || '' }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image.cache-scope }}
