@@ -8,7 +8,8 @@ ENSHROUDED_CONFIG="$GAME_PATH/enshrouded_server.json"
 shutdown() {
   echo ""
   echo "Received SIGTERM, shutting down gracefully"
-  kill -s INT "$enshrouded_pid"
+  echo "Sending SIGINT to Proton process (PID: $proton_pid)"
+  kill -INT "$proton_pid"
 }
 
 # Function to update JSON config using jq
@@ -46,30 +47,31 @@ cd "$GAME_PATH"
 
 echo "Starting Enshrouded Dedicated Server"
 "${STEAMCMD_PATH}/compatibilitytools.d/GE-Proton${PROTON_VERSION}/proton" run "${GAME_PATH}/enshrouded_server.exe" &
+proton_pid=$!
+echo "Proton wrapper started with PID: $proton_pid"
 
-# Find pid for enshrouded_server.exe
+# Wait for the game server to be fully running
 timeout=0
 while [ $timeout -lt 11 ]; do
-  if ps -e | grep "enshrouded_serv"; then
-    enshrouded_pid=$(ps -e | grep "enshrouded_serv" | awk '{print $1}')
-    echo "enshrouded_server.exe is running with PID: $enshrouded_pid"
+  if ps -e | grep "[e]nshrouded_serv" > /dev/null 2>&1; then
+    enshrouded_pid=$(ps -e | grep "[e]nshrouded_serv" | awk '{print $1}' | head -n1)
+    echo "Enshrouded server discovered with PID: $enshrouded_pid"
     break
   elif [ $timeout -eq 10 ]; then
-    echo "Timed out waiting for enshrouded_server.exe to be running" >&2
+    echo "Timed out waiting for enshrouded_server.exe to start" >&2
     exit 1
   fi
   sleep 6
   timeout=$((timeout + 1))
-  echo "Waiting for enshrouded_server.exe to be running..."
+  echo "Waiting for enshrouded_server.exe to start..."
 done
 
-# Hold us open until we recieve a SIGTERM by opening a job waiting for the process to finish then calling `wait`
-tail --pid="$enshrouded_pid" -f /dev/null &
-wait
+# Wait for the Proton process
+wait "$proton_pid"
 
-# Handle post SIGTERM from here (SIGTERM will cancel the `wait` immediately even though the job is not done yet)
-# Check if the enshrouded_server.exe process is still running, and if so, wait for it to close, indicating full shutdown, then go home
-if ps -e | grep "enshrouded_serv"; then
+# After Proton exits, ensure the game process has also fully stopped
+if ps -e | grep "[e]nshrouded_serv" > /dev/null 2>&1; then
+  echo "Waiting for Enshrouded server process to fully exit..."
   tail --pid="$enshrouded_pid" -f /dev/null
 fi
 
