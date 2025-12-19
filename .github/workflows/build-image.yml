@@ -94,7 +94,14 @@ jobs:
             tags: ghcr.io/strayer/game-server-deployment-discord-bot/enshrouded:latest
             cache-scope: enshrouded
             base-cache-scope: steamcmd
-          
+
+          - name: abiotic-factor
+            target: abiotic-factor
+            file: Dockerfile.steamcmd
+            tags: ghcr.io/strayer/game-server-deployment-discord-bot/abiotic-factor:latest
+            cache-scope: abiotic-factor
+            base-cache-scope: steamcmd
+
           - name: backup
             file: Dockerfile.backup
             tags: ghcr.io/strayer/game-server-deployment-discord-bot/backup:latest

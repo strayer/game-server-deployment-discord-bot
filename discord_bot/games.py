@@ -85,3 +85,12 @@ ENSHROUDED = Game(
     bot_message_started="Enshrouded is shutting down...",
     bot_message_finished="Enshrouded server has been destroyed and savegame backed up 🧨💥",
 )
+
+ABIOTIC_FACTOR = Game(
+    game_name="abiotic-factor",
+    game_display_name="Abiotic Factor",
+    bot_message_server_started="Abiotic Factor has been installed and save state backup restored, starting game server...",
+    bot_message_server_ready="Abiotic Factor server is ready!",
+    bot_message_started="Abiotic Factor is shutting down...",
+    bot_message_finished="Abiotic Factor server has been destroyed and savegame backed up 🧨💥",
+)

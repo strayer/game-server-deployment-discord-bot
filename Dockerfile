@@ -81,6 +81,7 @@ COPY terraform/terraform-entrypoint.sh /app/terraform/
 COPY terraform/valheim/main.tf terraform/valheim/.terraform.lock.hcl terraform/valheim/cloud-init.tftpl /app/terraform/valheim/
 COPY terraform/factorio/main.tf terraform/factorio/.terraform.lock.hcl terraform/factorio/cloud-init.tftpl /app/terraform/factorio/
 COPY terraform/enshrouded/main.tf terraform/enshrouded/.terraform.lock.hcl terraform/enshrouded/cloud-init.tftpl /app/terraform/enshrouded/
+COPY terraform/abiotic-factor/main.tf terraform/abiotic-factor/.terraform.lock.hcl terraform/abiotic-factor/cloud-init.tftpl /app/terraform/abiotic-factor/
 
 ENV TF_DATA_DIR_BASE=/terraform/init
 

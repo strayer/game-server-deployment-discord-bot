@@ -196,6 +196,48 @@ async def stop_enshrouded(ctx: lightbulb.SlashContext) -> None:
 
 
 @bot.command
+@lightbulb.command(
+    f"{COMMAND_PREFIX}start-abiotic-factor",
+    "Starts the Abiotic Factor dedicated server.",
+    guilds=[GUILD_ID],
+    auto_defer=True,
+)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def start_abiotic_factor(ctx: lightbulb.SlashContext) -> None:
+    if not await authorize(ctx):
+        return
+    if not await cooldown(ctx, 60):
+        return
+
+    log_command(ctx)
+
+    await ctx.respond("Abiotic Factor start trigger received, this may take a few minutes")
+
+    jobs.get_queue().enqueue(jobs.start_abiotic_factor_server)
+
+
+@bot.command
+@lightbulb.command(
+    f"{COMMAND_PREFIX}stop-abiotic-factor",
+    "Stops the Abiotic Factor dedicated server.",
+    guilds=[GUILD_ID],
+    auto_defer=True,
+)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def stop_abiotic_factor(ctx: lightbulb.SlashContext) -> None:
+    if not await authorize(ctx):
+        return
+    if not await cooldown(ctx, 60):
+        return
+
+    log_command(ctx)
+
+    await ctx.respond("Server stop trigger received, this may take a few minutes")
+
+    jobs.get_queue().enqueue(jobs.stop_abiotic_factor_server)
+
+
+@bot.command
 @lightbulb.command(f"{COMMAND_PREFIX}ping", "pong?", guilds=[GUILD_ID], auto_defer=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def ping(ctx: lightbulb.SlashContext) -> None:

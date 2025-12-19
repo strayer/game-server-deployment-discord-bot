@@ -107,3 +107,34 @@ USER steam
 WORKDIR $GAME_PATH
 
 CMD [ "/opt/bin/start-enshrouded.sh" ]
+
+#
+# Abiotic Factor
+#
+
+FROM steamcmd AS abiotic-factor
+
+ENV STEAMAPPID=2857200
+ENV GAME_NAME=abiotic-factor
+ENV GAME_DISPLAY_NAME="Abiotic Factor"
+ENV GAME_PATH=/opt/abiotic-factor
+
+ENV USE_PROTON=1
+ENV PROTON_VERSION="10-26"
+ENV STEAM_COMPAT_DATA_PATH="${STEAMCMD_PATH}/steamapps/compatdata/${STEAMAPPID}"
+
+USER root
+
+RUN mkdir -p "$GAME_PATH" && chown steam:steam "$GAME_PATH"
+
+COPY --chmod=755 docker/abiotic-factor/start.sh /opt/bin/start-abiotic-factor.sh
+
+RUN mkdir -p "${GAME_PATH}/AbioticFactor" && ln -s "$GAMEDATA_PATH" "${GAME_PATH}/AbioticFactor/Saved"
+
+USER steam
+
+WORKDIR $GAME_PATH
+
+STOPSIGNAL SIGINT
+
+CMD [ "/opt/bin/start-abiotic-factor.sh" ]

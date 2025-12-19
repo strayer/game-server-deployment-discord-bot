@@ -58,3 +58,11 @@ def start_enshrouded_server() -> None:
 
 def stop_enshrouded_server() -> None:
     stop_server(game=games.ENSHROUDED)
+
+
+def start_abiotic_factor_server() -> None:
+    start_server(game=games.ABIOTIC_FACTOR)
+
+
+def stop_abiotic_factor_server() -> None:
+    stop_server(game=games.ABIOTIC_FACTOR)
