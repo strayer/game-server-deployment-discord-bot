@@ -6,7 +6,7 @@ authors = [{ name = "Sven Grunewaldt", email = "strayer@olle-orks.org" }]
 dependencies = [
     "loguru >=0.7.0,<0.8.0",
     "hikari>=2.1.0,<3.0.0",
-    "hikari-lightbulb >=2.3.0,<3.0.0",
+    "hikari-lightbulb >=3.2.3,<3.3.0",
     "rq >=2.1.0,<3.0.0",
     "sentry-sdk[rq] >=2.8.0,<3.0.0",
     "docker >=7.0.0,<8.0.0",
