@@ -34,6 +34,9 @@ elif GAME_NAME == "factorio":
 elif GAME_NAME == "enshrouded":
     CONTAINER_NAME = "enshrouded-server"
     REGEX_PATTERN = r"\[Session\] 'HostOnline' \(up\)!"
+elif GAME_NAME == "abiotic-factor":
+    CONTAINER_NAME = "abiotic-factor-server"
+    REGEX_PATTERN = r"Session creation completed\."
 elif GAME_NAME is None or GAME_NAME == "":
     logger.error("GAME_NAME environment variable required to function")
     sys.exit(-1)
@@ -52,10 +55,10 @@ class ServerAddresses:
     domain: str | None
 
     def __str__(self) -> str:
-        # At time of writing Enshrouded does not support IPv6
+        # At time of writing Enshrouded and Abiotic Factor do not support IPv6
         ip_part = (
             self.ipv4
-            if self.ipv6 is None or GAME_NAME == "enshrouded"
+            if self.ipv6 is None or GAME_NAME in ("enshrouded", "abiotic-factor")
             else f"{self.ipv4}, {self.ipv6}"
         )
 
