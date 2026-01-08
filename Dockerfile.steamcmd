@@ -129,7 +129,7 @@ RUN mkdir -p "$GAME_PATH" && chown steam:steam "$GAME_PATH"
 
 COPY --chmod=755 docker/abiotic-factor/start.sh /opt/bin/start-abiotic-factor.sh
 
-RUN mkdir -p "${GAME_PATH}/AbioticFactor" && ln -s "$GAMEDATA_PATH" "${GAME_PATH}/AbioticFactor/Saved"
+RUN mkdir -p "${GAME_PATH}/AbioticFactor" && ln -s "$GAMEDATA_PATH" "${GAME_PATH}/AbioticFactor/Saved" && chown -R steam:steam "${GAME_PATH}/AbioticFactor"
 
 USER steam
 
