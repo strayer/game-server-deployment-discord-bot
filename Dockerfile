@@ -1,4 +1,4 @@
-FROM python:3.11.1 AS build
+FROM python:3.14.2 AS build
 
 COPY --from=ghcr.io/astral-sh/uv:0.9.5 /uv /bin/uv
 
@@ -22,7 +22,7 @@ WORKDIR /app
 
 COPY discord_bot/ ./discord_bot/
 
-FROM python:3.11.1-slim AS runtime-discord-bot
+FROM python:3.14.2-slim AS runtime-discord-bot
 
 ENV \
   # Use the virtual environment automatically
@@ -37,7 +37,7 @@ COPY --from=build /app/ /app/
 
 CMD [ "python", "-m", "discord_bot.bot" ]
 
-FROM python:3.11.1-slim AS runtime-job-runner
+FROM python:3.14.2-slim AS runtime-job-runner
 
 ENV \
   # Use the virtual environment automatically
@@ -89,7 +89,7 @@ ENTRYPOINT [ "/app/terraform/terraform-entrypoint.sh" ]
 
 CMD [ "rq", "worker", "-c", "discord_bot.sentry", "--with-scheduler" ]
 
-FROM python:3.11.1-slim AS runtime-server-launch-watcher
+FROM python:3.14.2-slim AS runtime-server-launch-watcher
 
 ENV \
   # Use the virtual environment automatically
