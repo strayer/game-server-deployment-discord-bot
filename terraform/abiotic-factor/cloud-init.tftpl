@@ -119,12 +119,14 @@ packages:
   - jq
 
 runcmd:
+  # Mount the persistent volume for game installation
+  - mkdir -p /mnt/abiotic-factor-install
+  - mount -o discard,defaults /dev/disk/by-id/scsi-0HC_Volume_${ abiotic_factor_volume_id } /mnt/abiotic-factor-install
+  - mkdir -p /mnt/abiotic-factor-install/steamcmd /mnt/abiotic-factor-install/steam /mnt/abiotic-factor-install/abiotic-factor
+  - chown -R 1000:1000 /mnt/abiotic-factor-install
   - docker pull ghcr.io/strayer/game-server-deployment-discord-bot/abiotic-factor:latest
   - docker pull ghcr.io/strayer/game-server-deployment-discord-bot/backup:latest
   - docker pull ghcr.io/strayer/game-server-deployment-discord-bot/server-launch-watcher:latest
-  - docker volume create steamcmd
-  - docker volume create steam
-  - docker volume create abiotic-factor
   - mkdir /gamedata
   - chown -R 1000 /gamedata
   - |
@@ -137,9 +139,9 @@ runcmd:
   - BOT_MESSAGE="${ bot_server_started_message }" discord-notify
   - |
       docker run -d --read-only --network=host \
-        -v steamcmd:/opt/steamcmd \
-        -v steam:/home/steam \
-        -v abiotic-factor:/opt/abiotic-factor \
+        -v /mnt/abiotic-factor-install/steamcmd:/opt/steamcmd \
+        -v /mnt/abiotic-factor-install/steam:/home/steam \
+        -v /mnt/abiotic-factor-install/abiotic-factor:/opt/abiotic-factor \
         -v /gamedata:/gamedata \
         --tmpfs /tmp:uid=1000 \
         -e "SERVER_NAME=${ abiotic_factor_server_name }" \

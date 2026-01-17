@@ -213,6 +213,10 @@ data "hcloud_image" "debian-12" {
   with_architecture = "x86"
 }
 
+data "hcloud_volume" "abiotic_factor_install" {
+  name = "abiotic-factor-install"
+}
+
 resource "hcloud_server" "abiotic-factor-server" {
   name        = "abiotic-factor-server"
   image       = data.hcloud_image.debian-12.id
@@ -233,7 +237,14 @@ resource "hcloud_server" "abiotic-factor-server" {
     abiotic_factor_discord_channel_webhook      = var.abiotic_factor_discord_channel_webhook
     bot_server_started_message                  = var.bot_server_started_message,
     bot_server_ready_message                    = var.bot_server_ready_message,
+    abiotic_factor_volume_id                    = data.hcloud_volume.abiotic_factor_install.id,
   })
+}
+
+resource "hcloud_volume_attachment" "abiotic_factor_install" {
+  volume_id = data.hcloud_volume.abiotic_factor_install.id
+  server_id = hcloud_server.abiotic-factor-server.id
+  automount = false
 }
 
 resource "hcloud_rdns" "abiotic-factor-server-ipv4" {
