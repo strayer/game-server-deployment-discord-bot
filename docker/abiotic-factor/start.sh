@@ -36,6 +36,10 @@ fi
 
 cd "$GAME_PATH"
 
+# Create symlink for game saves (needed because volume mount covers the image's symlink)
+mkdir -p "${GAME_PATH}/AbioticFactor"
+ln -sfn "$GAMEDATA_PATH" "${GAME_PATH}/AbioticFactor/Saved"
+
 # Set up log redirection to stdout
 LOG_DIR="${GAME_PATH}/AbioticFactor/Saved/Logs"
 mkdir -p "$LOG_DIR"
