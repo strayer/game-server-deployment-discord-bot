@@ -12,21 +12,8 @@ terraform {
     }
   }
 
-  backend "s3" {
-    # set endpoint via AWS_S3_ENDPOINT env
-    # set region via AWS_REGION env
-    # set access_key via AWS_ACCESS_KEY_ID env
-    # set secret_access_key via AWS_SECRET_ACCESS_KEY env
-    # set bucket via terraform init -backend-config="bucket=..." CLI option
-
-    key = "valheim"
-
-    skip_credentials_validation = true
-    skip_requesting_account_id  = true
-    skip_metadata_api_check     = true
-    skip_region_validation      = true
-    skip_s3_checksum            = true
-    use_path_style              = true
+  backend "local" {
+    path = "/terraform/state/valheim/terraform.tfstate"
   }
 }
 
