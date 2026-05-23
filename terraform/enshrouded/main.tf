@@ -22,12 +22,7 @@ variable "hcloud_token" {
   sensitive = true
 }
 
-variable "cloudflare_email" {
-  type      = string
-  sensitive = true
-}
-
-variable "cloudflare_api_key" {
+variable "cloudflare_api_token" {
   type      = string
   sensitive = true
 }
@@ -109,8 +104,7 @@ provider "hcloud" {
 }
 
 provider "cloudflare" {
-  email   = var.cloudflare_email
-  api_key = var.cloudflare_api_key
+  api_token = var.cloudflare_api_token
 }
 
 
