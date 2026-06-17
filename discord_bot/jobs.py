@@ -66,3 +66,11 @@ def start_abiotic_factor_server() -> None:
 
 def stop_abiotic_factor_server() -> None:
     stop_server(game=games.ABIOTIC_FACTOR)
+
+
+def start_windrose_server() -> None:
+    start_server(game=games.WINDROSE)
+
+
+def stop_windrose_server() -> None:
+    stop_server(game=games.WINDROSE)

@@ -20,6 +20,10 @@ if [ "$GAME_NAME" = "abiotic-factor" ]; then
   discord_channel_webhook="$TF_VAR_abiotic_factor_discord_channel_webhook"
 fi
 
+if [ "$GAME_NAME" = "windrose" ]; then
+  discord_channel_webhook="$TF_VAR_windrose_discord_channel_webhook"
+fi
+
 json_message=$(jq -n \
   --arg content "$BOT_MESSAGE_STARTED" \
   '{$content}')
@@ -40,6 +44,11 @@ if [ "$GAME_NAME" = "valheim" ]; then
 fi
 if [ "$GAME_NAME" = "factorio" ] || [ "$GAME_NAME" = "enshrouded" ] || [ "$GAME_NAME" = "abiotic-factor" ]; then
   ssh -i "/sshkey/sshkey.$GAME_NAME" -o "StrictHostKeyChecking no" "root@$SERVER_IP" "docker stop $GAME_NAME-server"
+fi
+# Windrose uses a longer stop timeout so the server can flush its RocksDB world
+# save during the wineserver -k graceful shutdown before SIGKILL.
+if [ "$GAME_NAME" = "windrose" ]; then
+  ssh -i "/sshkey/sshkey.$GAME_NAME" -o "StrictHostKeyChecking no" "root@$SERVER_IP" "docker stop -t 90 $GAME_NAME-server"
 fi
 sleep 5
 

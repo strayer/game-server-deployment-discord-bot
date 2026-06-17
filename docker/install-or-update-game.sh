@@ -17,10 +17,16 @@ fi
 
 mkdir -p "$GAME_PATH"
 
+# steamcmd frequently returns transient errors for anonymous app downloads -
+# most commonly "Missing configuration", but also bare non-zero exits (e.g. code 8)
+# on a subsequent attempt. Retry on ANY non-zero exit up to a bounded number of
+# attempts with a short backoff, rather than only on the "Missing configuration"
+# string (which previously caused a fatal bail-out when a retry returned exit 8).
+MAX_ATTEMPTS="${STEAMCMD_MAX_ATTEMPTS:-8}"
 attempt=1
 
 while true; do
-  echo "--> Attempt $attempt"
+  echo "--> Attempt $attempt of $MAX_ATTEMPTS"
 
   set +e
   "$STEAMCMD_PATH/steamcmd.sh" "${STEAM_ARGS[@]}" | tee /tmp/steamcmd_output.txt
@@ -32,11 +38,12 @@ while true; do
     exit 0
   fi
 
-  if grep -q "Missing configuration" /tmp/steamcmd_output.txt; then
-    echo "--> Got 'Missing configuration' error, retrying..."
-    attempt=$((attempt + 1))
-  else
-    echo "--> Failed with non-retryable error (exit code: $exit_code)"
+  if [ $attempt -ge $MAX_ATTEMPTS ]; then
+    echo "--> Failed after $attempt attempts (last exit code: $exit_code)"
     exit $exit_code
   fi
+
+  echo "--> steamcmd attempt $attempt failed (exit code: $exit_code), retrying..."
+  attempt=$((attempt + 1))
+  sleep 5
 done

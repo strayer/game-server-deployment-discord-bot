@@ -94,3 +94,12 @@ ABIOTIC_FACTOR = Game(
     bot_message_started="Abiotic Factor is shutting down...",
     bot_message_finished="Abiotic Factor server has been destroyed and savegame backed up 🧨💥",
 )
+
+WINDROSE = Game(
+    game_name="windrose",
+    game_display_name="Windrose",
+    bot_message_server_started="Windrose has been installed and save state backup restored, starting game server...",
+    bot_message_server_ready="Windrose server is ready!",
+    bot_message_started="Windrose is shutting down...",
+    bot_message_finished="Windrose server has been destroyed and savegame backed up 🧨💥",
+)

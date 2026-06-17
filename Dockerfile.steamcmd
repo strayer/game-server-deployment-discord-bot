@@ -138,3 +138,34 @@ WORKDIR $GAME_PATH
 STOPSIGNAL SIGINT
 
 CMD [ "/opt/bin/start-abiotic-factor.sh" ]
+
+#
+# Windrose
+#
+
+FROM steamcmd AS windrose
+
+ENV STEAMAPPID=4129620
+ENV GAME_NAME=windrose
+ENV GAME_DISPLAY_NAME="Windrose"
+ENV GAME_PATH=/opt/windrose
+
+ENV USE_PROTON=1
+ENV PROTON_VERSION="10-34"
+ENV STEAM_COMPAT_DATA_PATH="${STEAMCMD_PATH}/steamapps/compatdata/${STEAMAPPID}"
+
+USER root
+
+RUN mkdir -p "$GAME_PATH" && chown steam:steam "$GAME_PATH"
+
+COPY --chmod=755 docker/windrose/start.sh /opt/bin/start-windrose.sh
+
+RUN mkdir -p "${GAME_PATH}/R5" && ln -s "$GAMEDATA_PATH" "${GAME_PATH}/R5/Saved" && chown -R steam:steam "${GAME_PATH}/R5"
+
+USER steam
+
+WORKDIR $GAME_PATH
+
+STOPSIGNAL SIGINT
+
+CMD [ "/opt/bin/start-windrose.sh" ]

@@ -37,6 +37,12 @@ elif GAME_NAME == "enshrouded":
 elif GAME_NAME == "abiotic-factor":
     CONTAINER_NAME = "abiotic-factor-server"
     REGEX_PATTERN = r"Session creation completed\."
+elif GAME_NAME == "windrose":
+    CONTAINER_NAME = "windrose-server"
+    # R5LogCoopProxy ... SetIsReadyForHostOwnerConnect: fires after the save DB has
+    # loaded and the listeners are up - the true "ready for players" gate. (The port
+    # "listening" line is unreliable: it fires for the lobby before the world loads.)
+    REGEX_PATTERN = r"Host server is ready for owner to connect"
 elif GAME_NAME is None or GAME_NAME == "":
     logger.error("GAME_NAME environment variable required to function")
     sys.exit(-1)
@@ -55,10 +61,11 @@ class ServerAddresses:
     domain: str | None
 
     def __str__(self) -> str:
-        # At time of writing Enshrouded and Abiotic Factor do not support IPv6
+        # At time of writing Enshrouded, Abiotic Factor and Windrose do not support IPv6
         ip_part = (
             self.ipv4
-            if self.ipv6 is None or GAME_NAME in ("enshrouded", "abiotic-factor")
+            if self.ipv6 is None
+            or GAME_NAME in ("enshrouded", "abiotic-factor", "windrose")
             else f"{self.ipv4}, {self.ipv6}"
         )
 

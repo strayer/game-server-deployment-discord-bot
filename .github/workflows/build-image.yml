@@ -102,6 +102,13 @@ jobs:
             cache-scope: abiotic-factor
             base-cache-scope: steamcmd
 
+          - name: windrose
+            target: windrose
+            file: Dockerfile.steamcmd
+            tags: ghcr.io/strayer/game-server-deployment-discord-bot/windrose:latest
+            cache-scope: windrose
+            base-cache-scope: steamcmd
+
           - name: backup
             file: Dockerfile.backup
             tags: ghcr.io/strayer/game-server-deployment-discord-bot/backup:latest

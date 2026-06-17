@@ -238,6 +238,48 @@ async def stop_abiotic_factor(ctx: lightbulb.SlashContext) -> None:
 
 
 @bot.command
+@lightbulb.command(
+    f"{COMMAND_PREFIX}start-windrose",
+    "Starts the Windrose dedicated server.",
+    guilds=[GUILD_ID],
+    auto_defer=True,
+)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def start_windrose(ctx: lightbulb.SlashContext) -> None:
+    if not await authorize(ctx):
+        return
+    if not await cooldown(ctx, 60):
+        return
+
+    log_command(ctx)
+
+    await ctx.respond("Windrose start trigger received, this may take a few minutes")
+
+    jobs.get_queue().enqueue(jobs.start_windrose_server)
+
+
+@bot.command
+@lightbulb.command(
+    f"{COMMAND_PREFIX}stop-windrose",
+    "Stops the Windrose dedicated server.",
+    guilds=[GUILD_ID],
+    auto_defer=True,
+)
+@lightbulb.implements(lightbulb.SlashCommand)
+async def stop_windrose(ctx: lightbulb.SlashContext) -> None:
+    if not await authorize(ctx):
+        return
+    if not await cooldown(ctx, 60):
+        return
+
+    log_command(ctx)
+
+    await ctx.respond("Server stop trigger received, this may take a few minutes")
+
+    jobs.get_queue().enqueue(jobs.stop_windrose_server)
+
+
+@bot.command
 @lightbulb.command(f"{COMMAND_PREFIX}ping", "pong?", guilds=[GUILD_ID], auto_defer=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def ping(ctx: lightbulb.SlashContext) -> None:
