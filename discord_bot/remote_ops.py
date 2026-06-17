@@ -81,7 +81,10 @@ def pull_gamedata(game: Game, ip: str) -> None:
     backup_path = os.environ.get("BACKUP_PATH", "/backup")
     dest_dir = pathlib.Path(backup_path) / game.game_name / "current"
     dest_dir.mkdir(parents=True, exist_ok=True)
-    rsync_ssh = f"ssh -i {SSH_KEY_PATH} -o StrictHostKeyChecking=no"
+    rsync_ssh = (
+        f"ssh -i {SSH_KEY_PATH} -o StrictHostKeyChecking=no "
+        "-o UserKnownHostsFile=/dev/null"
+    )
     subprocess.run(
         [
             "rsync",

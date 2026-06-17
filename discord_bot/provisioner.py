@@ -9,6 +9,7 @@ SSH key, and never deletes ``<game>-install`` volumes (adopt/attach/detach only)
 from __future__ import annotations
 
 import dataclasses
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -16,7 +17,6 @@ from pathlib import Path
 import backoff
 from hcloud import APIException, Client
 from hcloud.firewalls.domain import FirewallRule
-from hcloud.images.domain import Image
 from hcloud.locations.domain import Location
 from hcloud.server_types.domain import ServerType
 from hcloud.servers.client import BoundServer
@@ -268,6 +268,22 @@ class Provisioner:
                 action.wait_until_finished()
         return resp.firewall
 
+    # -------------------------------------------------------------------- image
+
+    @_retry
+    def _resolve_image(self, spec):
+        """Resolve the OS image, pinning the architecture (was `with_architecture`
+        in Terraform) so we never accidentally pick the arm64 ``debian-12``."""
+        image = self.client.images.get_by_name_and_architecture(
+            spec.image, spec.image_architecture
+        )
+        if image is None:
+            raise ProvisionError(
+                "image",
+                f"image {spec.image!r} ({spec.image_architecture}) not found.",
+            )
+        return image
+
     # ------------------------------------------------------------------ deploy
 
     def reconcile(self, game: Game) -> None:
@@ -302,6 +318,7 @@ class Provisioner:
 
             created_firewall = self._recreate_firewall(game)
             ssh_keys = self._all_project_ssh_keys()
+            image = self._resolve_image(spec)
 
             logger.info(
                 "Creating server {name} ({type} @ {loc}){vol}",
@@ -313,7 +330,7 @@ class Provisioner:
             resp = self.client.servers.create(
                 name=game.server_name,
                 server_type=ServerType(name=spec.server_type),
-                image=Image(name=spec.image),
+                image=image,
                 location=Location(name=spec.location),
                 user_data=user_data,
                 ssh_keys=ssh_keys,
@@ -442,8 +459,6 @@ class Provisioner:
 
 def client_from_env() -> Client:
     """Build a Hetzner client from the token (reuses the existing TF_VAR env var)."""
-    import os
-
     token = os.environ.get("HCLOUD_TOKEN") or os.environ.get("TF_VAR_hcloud_token")
     if not token:
         raise ProvisionError(

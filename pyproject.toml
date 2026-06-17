@@ -28,6 +28,9 @@ test = [
 [tool.setuptools.packages.find]
 include = ["discord_bot*"]
 
+[tool.setuptools.package-data]
+"discord_bot.cloud_init" = ["*.tftpl"]
+
 [tool.uv]
 
 [tool.pyright]
