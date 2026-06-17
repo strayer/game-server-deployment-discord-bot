@@ -47,27 +47,11 @@ ENV \
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Install terraform
-ARG TERRAFORM_VERSION=1.10.5
-RUN export PACKAGES="curl gnupg libdigest-sha-perl unzip" && \
-  export TERRAFORM_ARCH="$(arch | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)" && \
-  apt-get update && apt-get install --no-install-recommends -y $PACKAGES  && \
-  mkdir /terraformdl && \
-  cd /terraformdl && \
-  curl -L https://keybase.io/hashicorp/pgp_keys.asc | gpg --import - && \
-  curl -LO https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_${TERRAFORM_ARCH}.zip && \
-  curl -LO https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_SHA256SUMS.sig && \
-  curl -LO https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_SHA256SUMS && \
-  gpg --verify terraform_${TERRAFORM_VERSION}_SHA256SUMS.sig terraform_${TERRAFORM_VERSION}_SHA256SUMS && \
-  shasum --algorithm 256 --ignore-missing --check terraform_${TERRAFORM_VERSION}_SHA256SUMS && \
-  unzip terraform_${TERRAFORM_VERSION}_linux_${TERRAFORM_ARCH}.zip && \
-  mv terraform /usr/local/bin && \
-  chmod +x /usr/local/bin/terraform && \
-  apt-get purge -y --auto-remove $PACKAGES && \
-  rm -rf /var/lib/apt/lists
-
+# Provisioning now talks to the Hetzner API directly (hcloud SDK); Terraform is gone.
+# openssh-client + rsync are still needed for the SSH stop/restic-backup teardown step
+# (discord_bot/remote_ops.py).
 RUN apt-get update && \
-  apt-get install --no-install-recommends -y ca-certificates curl openssh-client rsync bzip2 jq && \
+  apt-get install --no-install-recommends -y ca-certificates openssh-client rsync && \
   rm -rf /var/lib/apt/lists
 
 WORKDIR /app
@@ -75,21 +59,8 @@ WORKDIR /app
 COPY --from=build /opt/.venv/ /opt/.venv/
 COPY --from=build /app/ /app/
 
-COPY scripts/ /app/scripts/
-COPY terraform/terraform-entrypoint.sh /app/terraform/
-
-# cloud-init templates now ship with the package (discord_bot/cloud_init/*.tftpl,
-# copied via `COPY --from=build /app/` above). Terraform configs are still copied
-# until the Terraform removal phase.
-COPY terraform/valheim/main.tf terraform/valheim/.terraform.lock.hcl /app/terraform/valheim/
-COPY terraform/factorio/main.tf terraform/factorio/.terraform.lock.hcl /app/terraform/factorio/
-COPY terraform/enshrouded/main.tf terraform/enshrouded/.terraform.lock.hcl /app/terraform/enshrouded/
-COPY terraform/abiotic-factor/main.tf terraform/abiotic-factor/.terraform.lock.hcl /app/terraform/abiotic-factor/
-COPY terraform/windrose/main.tf terraform/windrose/.terraform.lock.hcl /app/terraform/windrose/
-
-ENV TF_DATA_DIR_BASE=/terraform/init
-
-ENTRYPOINT [ "/app/terraform/terraform-entrypoint.sh" ]
+# cloud-init templates ship with the package (discord_bot/cloud_init/*.tftpl,
+# copied via `COPY --from=build /app/` above).
 
 CMD [ "rq", "worker", "-c", "discord_bot.sentry", "--with-scheduler" ]
 
