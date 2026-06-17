@@ -78,11 +78,14 @@ COPY --from=build /app/ /app/
 COPY scripts/ /app/scripts/
 COPY terraform/terraform-entrypoint.sh /app/terraform/
 
-COPY terraform/valheim/main.tf terraform/valheim/.terraform.lock.hcl terraform/valheim/cloud-init.tftpl /app/terraform/valheim/
-COPY terraform/factorio/main.tf terraform/factorio/.terraform.lock.hcl terraform/factorio/cloud-init.tftpl /app/terraform/factorio/
-COPY terraform/enshrouded/main.tf terraform/enshrouded/.terraform.lock.hcl terraform/enshrouded/cloud-init.tftpl /app/terraform/enshrouded/
-COPY terraform/abiotic-factor/main.tf terraform/abiotic-factor/.terraform.lock.hcl terraform/abiotic-factor/cloud-init.tftpl /app/terraform/abiotic-factor/
-COPY terraform/windrose/main.tf terraform/windrose/.terraform.lock.hcl terraform/windrose/cloud-init.tftpl /app/terraform/windrose/
+# cloud-init templates now ship with the package (discord_bot/cloud_init/*.tftpl,
+# copied via `COPY --from=build /app/` above). Terraform configs are still copied
+# until the Terraform removal phase.
+COPY terraform/valheim/main.tf terraform/valheim/.terraform.lock.hcl /app/terraform/valheim/
+COPY terraform/factorio/main.tf terraform/factorio/.terraform.lock.hcl /app/terraform/factorio/
+COPY terraform/enshrouded/main.tf terraform/enshrouded/.terraform.lock.hcl /app/terraform/enshrouded/
+COPY terraform/abiotic-factor/main.tf terraform/abiotic-factor/.terraform.lock.hcl /app/terraform/abiotic-factor/
+COPY terraform/windrose/main.tf terraform/windrose/.terraform.lock.hcl /app/terraform/windrose/
 
 ENV TF_DATA_DIR_BASE=/terraform/init
 
