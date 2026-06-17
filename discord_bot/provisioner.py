@@ -286,16 +286,6 @@ class Provisioner:
 
     # ------------------------------------------------------------------ deploy
 
-    def reconcile(self, game: Game) -> None:
-        """Reap a half-finished deploy's orphan support resources.
-
-        If the named server exists it's a live deploy — caller must refuse. If there
-        is no server but a leftover firewall, delete it. Volumes are NEVER reaped.
-        """
-        if self.is_deployed(game):
-            raise AlreadyDeployedError(game)
-        self._delete_firewall_if_present(game)
-
     def deploy(self, game: Game) -> DeployResult:
         """Provision a game server. Ends once the server exists and its IP is known —
         does NOT wait for the game to be playable (readiness is the watcher's job)."""
@@ -370,7 +360,9 @@ class Provisioner:
         firewall: BoundFirewall | None,
     ) -> None:
         """Best-effort cleanup of just-created resources. Never touch volumes.
-        Anything missed here is caught by the next reconcile()."""
+        Anything missed here is recognised on the next deploy: the start-guard
+        refuses when the server exists, and a leftover firewall is delete-and-
+        recreated, so a half-finished deploy is always structurally recoverable."""
         if server is not None:
             try:
                 logger.warning("Rolling back: deleting server {n}", n=game.server_name)

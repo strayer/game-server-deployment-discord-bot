@@ -315,6 +315,9 @@ class TestDestroy:
         server.shutdown.assert_called_once()
         volume.detach.assert_called_once()
         server.delete.assert_called_once()
+        # Install volumes are sacred: detach only, never delete.
+        client.volumes.delete.assert_not_called()
+        volume.delete.assert_not_called()
 
     def test_shutdown_timeout_aborts(self, wired):
         provisioner, client = wired
@@ -341,29 +344,6 @@ class TestDestroy:
 
         assert excinfo.value.step == "backup"
         server.delete.assert_not_called()
-
-
-# --------------------------------------------------------------------- reconcile
-
-
-class TestReconcile:
-    def test_server_exists_raises(self, wired):
-        provisioner, client = wired
-        client.servers.get_by_name.return_value = _make_server()
-
-        with pytest.raises(AlreadyDeployedError):
-            provisioner.reconcile(FACTORIO)
-
-    def test_no_server_stale_firewall_deleted_no_volume_delete(self, wired):
-        provisioner, client = wired
-        client.servers.get_by_name.return_value = None
-        stale_fw = MagicMock(name="stale_firewall")
-        client.firewalls.get_by_name.return_value = stale_fw
-
-        provisioner.reconcile(ABIOTIC_FACTOR)
-
-        client.firewalls.delete.assert_called_once_with(stale_fw)
-        client.volumes.delete.assert_not_called()
 
 
 # ------------------------------------------------------------------- client_from_env

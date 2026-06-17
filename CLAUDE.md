@@ -28,7 +28,7 @@ The core components are:
     -   `bot.py`: Discord bot entry point (slash commands).
     -   `jobs.py`: rq jobs for start/stop; worker-side start-guard + Discord error reporting.
     -   `games.py`: per-game config — `ServerSpec` (server type, location, firewall ports, optional install volume, container stop strategy) + naming-convention helpers.
-    -   `provisioner.py`: Hetzner API deploy/destroy/reconcile.
+    -   `provisioner.py`: Hetzner API deploy/destroy.
     -   `cloud_init/`: Jinja2 renderer (`__init__.py`) + per-game `*.tftpl` templates.
     -   `remote_ops.py`: SSH stop + restic backup + rsync (the teardown step), keyed off the API-discovered IP and the shared `/sshkey/sshkey` key.
     -   `server_launch_watcher.py`: runs ON the game VM; posts the "ready" webhook.
