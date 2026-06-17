@@ -1,6 +1,4 @@
-from unittest.mock import patch
 
-import pytest
 
 from discord_bot import db
 
