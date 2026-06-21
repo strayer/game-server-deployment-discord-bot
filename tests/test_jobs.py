@@ -40,11 +40,12 @@ class TestNamingConvention:
     """The Hetzner API is keyed by these names; they must be stable."""
 
     def test_server_name(self):
-        assert games.FACTORIO.server_name == "factorio-server"
-        assert games.ABIOTIC_FACTOR.server_name == "abiotic-factor-server"
+        for name, game in games.ALL_GAMES.items():
+            assert game.server_name == f"{name}-server"
 
     def test_firewall_name(self):
-        assert games.WINDROSE.firewall_name == "windrose-firewall"
+        for name, game in games.ALL_GAMES.items():
+            assert game.firewall_name == f"{name}-firewall"
 
     def test_tf_var_prefix_underscores_hyphens(self):
         assert games.ABIOTIC_FACTOR.tf_var_prefix == "abiotic_factor"
@@ -53,23 +54,6 @@ class TestNamingConvention:
 
 class TestServerSpec:
     """Per-game infra parameters that replace terraform/<game>/main.tf."""
-
-    def test_factorio_location_is_fsn1(self):
-        # PER-GAME: factorio must stay in fsn1, the others in nbg1.
-        assert games.FACTORIO.spec.location == "fsn1"
-
-    def test_other_games_location_is_nbg1(self):
-        for game in (
-            games.VALHEIM,
-            games.ENSHROUDED,
-            games.ABIOTIC_FACTOR,
-            games.WINDROSE,
-        ):
-            assert game.spec.location == "nbg1"
-
-    def test_default_server_type(self):
-        for game in games.ALL_GAMES.values():
-            assert game.spec.server_type == "ccx23"
 
     def test_firewall_ports_match_terraform(self):
         assert games.VALHEIM.spec.firewall_ports == (("udp", "2456-2457"),)

@@ -1,5 +1,3 @@
-
-
 from discord_bot import db
 
 
@@ -55,7 +53,7 @@ class TestSetCooldown:
 class TestGetRedis:
     """Tests for the get_redis function."""
 
-    def test_returns_redis_instance(self):
+    def test_returns_redis_instance(self, patch_db_redis):
         redis_instance = db.get_redis()
 
         # Should return a Redis-like object

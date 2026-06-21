@@ -156,7 +156,9 @@ class TestDeploy:
 
     def test_volume_game_existing_volume(self, wired):
         provisioner, client = wired
-        existing_vol = _make_volume(volume_id=42, attached_server=None)
+        # A distinct id (not the _make_volume default) so the assertions below can't
+        # pass by coincidence against the mock default.
+        existing_vol = _make_volume(volume_id=7, attached_server=None)
         client.volumes.get_by_name.return_value = existing_vol
 
         with patch.object(
@@ -169,7 +171,7 @@ class TestDeploy:
         assert kwargs["volumes"] == [existing_vol]
         assert kwargs["automount"] is False
         # cloud_init.render must receive the existing volume's id.
-        assert render.call_args.kwargs["volume_id"] == 42
+        assert render.call_args.kwargs["volume_id"] == 7
 
     def test_volume_game_creates_missing_volume(self, wired):
         provisioner, client = wired
