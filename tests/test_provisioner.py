@@ -252,6 +252,22 @@ class TestSSHKey:
         assert excinfo.value.step == "ssh-key"
         client.ssh_keys.delete.assert_not_called()
 
+    def test_liveness_api_error_surfaces_as_ssh_key_error(self, wired):
+        provisioner, client = wired
+        stale = MagicMock(name="stale_key")
+        stale.public_key = "ssh-ed25519 AAAASTALE old"
+        client.ssh_keys.get_by_name.return_value = stale
+        # The shared-key liveness scan hits a (non-retryable) API error.
+        client.servers.get_by_name.side_effect = APIException(
+            code="boom", message="kaboom", details=None
+        )
+
+        with pytest.raises(ProvisionError) as excinfo:
+            provisioner._ensure_bot_ssh_key()
+
+        assert excinfo.value.step == "ssh-key"
+        client.ssh_keys.delete.assert_not_called()
+
 
 # ---------------------------------------------------------------------- firewall
 

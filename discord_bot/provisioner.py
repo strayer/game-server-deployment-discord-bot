@@ -1,4 +1,4 @@
-"""Imperative Hetzner Cloud provisioning that replaces the per-game Terraform.
+"""Imperative Hetzner Cloud provisioning.
 
 No state database: every resource is named by a fixed convention, so the Hetzner
 API itself is the source of truth for what is deployed. Ownership is by name —
@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 
 # The single, bot-managed SSH key shared by all games.
 BOT_SSH_KEY_NAME = "discord-bot"
-BOT_SSH_KEY_PATH = remote_ops.SSH_KEY_PATH  # "/sshkey/sshkey"
+BOT_SSH_KEY_PATH = remote_ops.SSH_KEY_PATH
 
 # Inbound firewall allows ICMP + the per-game game ports from anywhere; SSH (port
 # 22) is restricted to the bot's own egress IPv4 (see `_detect_egress_ipv4`).
@@ -190,11 +190,22 @@ class Provisioner:
         return self._get_server(game) is not None
 
     def _any_managed_server_live(self) -> bool:
-        """True if ANY game's server currently exists (the bot SSH key is shared)."""
-        for other in ALL_GAMES.values():
-            if self.client.servers.get_by_name(other.server_name) is not None:
-                return True
-        return False
+        """True if ANY game's server currently exists (the bot SSH key is shared).
+
+        Reuses the retry-wrapped ``_get_server`` and converts a persistent API
+        failure into a clear ssh-key-step error rather than a raw ``APIException``.
+        """
+        try:
+            return any(
+                self._get_server(other) is not None for other in ALL_GAMES.values()
+            )
+        except APIException as exc:
+            raise ProvisionError(
+                "ssh-key",
+                f"could not determine whether a managed server is live while "
+                f"validating the bot SSH key: {exc.message}",
+                cause=exc,
+            ) from exc
 
     # --------------------------------------------------------------- ssh keys
 
