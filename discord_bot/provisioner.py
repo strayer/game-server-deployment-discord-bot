@@ -185,27 +185,26 @@ class Provisioner:
 
     def _resolve_or_create_volume(self, game: Game) -> BoundVolume:
         spec = game.spec
-        assert spec.volume_name is not None
-        existing = self._get_volume(spec.volume_name)
+        existing = self._get_volume(game.volume_name)
         if existing is not None:
             return existing
 
         if spec.volume_size_gb is None or spec.volume_format is None:
             raise ProvisionError(
                 "volume",
-                f"volume {spec.volume_name!r} is missing and cannot be created "
+                f"volume {game.volume_name!r} is missing and cannot be created "
                 f"(size/format not configured).",
             )
         logger.info(
             "Creating install volume {name} ({size} GB, {fmt}) in {loc}",
-            name=spec.volume_name,
+            name=game.volume_name,
             size=spec.volume_size_gb,
             fmt=spec.volume_format,
             loc=spec.location,
         )
         resp = self.client.volumes.create(
             size=spec.volume_size_gb,
-            name=spec.volume_name,
+            name=game.volume_name,
             location=Location(name=spec.location),
             format=spec.volume_format,
             automount=False,
@@ -441,11 +440,10 @@ class Provisioner:
 
     def _detach_volume(self, game: Game) -> None:
         """Detach the install volume if attached. Never delete it."""
-        assert game.spec.volume_name is not None
-        volume = self._get_volume(game.spec.volume_name)
+        volume = self._get_volume(game.volume_name)
         if volume is None or volume.server is None:
             return
-        logger.info("Detaching volume {name}", name=game.spec.volume_name)
+        logger.info("Detaching volume {name}", name=game.volume_name)
         volume.detach().wait_until_finished()
 
 

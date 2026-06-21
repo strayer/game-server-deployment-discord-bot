@@ -25,9 +25,9 @@ class ServerSpec:
     image_architecture: str = "x86"
     firewall_ports: tuple[PortRule, ...] = ()
 
-    # Volume-backed games only (None otherwise). The volume is resolved by name and
-    # CREATED on demand when missing — size/format are required for that create.
-    volume_name: str | None = None
+    # Install volume (volume-backed games only). The volume is resolved by name
+    # (see ``Game.volume_name``) and CREATED on demand when missing — size/format
+    # are required for that create.
     volume_size_gb: int | None = None
     volume_format: str | None = None
 
@@ -45,7 +45,7 @@ class ServerSpec:
 
     @property
     def has_volume(self) -> bool:
-        return self.volume_name is not None
+        return self.volume_size_gb is not None
 
 
 class Game:
@@ -74,6 +74,10 @@ class Game:
     @property
     def firewall_name(self) -> str:
         return f"{self.game_name}-firewall"
+
+    @property
+    def volume_name(self) -> str:
+        return f"{self.game_name}-install"
 
     @property
     def tf_var_prefix(self) -> str:
@@ -140,7 +144,6 @@ ABIOTIC_FACTOR = Game(
     spec=ServerSpec(
         location="nbg1",
         firewall_ports=(("udp", "7777"), ("udp", "27015")),
-        volume_name="abiotic-factor-install",
         volume_size_gb=50,
         volume_format="xfs",
         # max players is not in the environment; it was a Terraform default (6).
@@ -158,7 +161,6 @@ WINDROSE = Game(
     spec=ServerSpec(
         location="nbg1",
         firewall_ports=(("tcp", "7777"), ("udp", "7777")),
-        volume_name="windrose-install",
         volume_size_gb=50,
         volume_format="xfs",
         # Longer stop timeout so the wineserver -k graceful shutdown can flush the

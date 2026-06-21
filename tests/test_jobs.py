@@ -92,14 +92,13 @@ class TestServerSpec:
 
     def test_volume_backed_games(self):
         assert games.ABIOTIC_FACTOR.spec.has_volume
-        assert games.ABIOTIC_FACTOR.spec.volume_name == "abiotic-factor-install"
+        assert games.ABIOTIC_FACTOR.volume_name == "abiotic-factor-install"
         assert games.WINDROSE.spec.has_volume
-        assert games.WINDROSE.spec.volume_name == "windrose-install"
+        assert games.WINDROSE.volume_name == "windrose-install"
 
     def test_non_volume_games(self):
         for game in (games.VALHEIM, games.FACTORIO, games.ENSHROUDED):
             assert not game.spec.has_volume
-            assert game.spec.volume_name is None
 
     def test_volume_games_have_size_and_format(self):
         for game in (games.ABIOTIC_FACTOR, games.WINDROSE):
