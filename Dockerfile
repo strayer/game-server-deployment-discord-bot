@@ -59,7 +59,7 @@ WORKDIR /app
 COPY --from=build /opt/.venv/ /opt/.venv/
 COPY --from=build /app/ /app/
 
-# cloud-init templates ship with the package (discord_bot/cloud_init/*.tftpl,
+# cloud-init templates ship with the package (discord_bot/cloud_init/*.yaml.j2,
 # copied via `COPY --from=build /app/` above).
 
 CMD [ "rq", "worker", "-c", "discord_bot.sentry", "--with-scheduler" ]

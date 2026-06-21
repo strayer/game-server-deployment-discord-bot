@@ -84,10 +84,10 @@ write_files:
   - owner: root:root
     path: /env-backup
     content: |
-      RESTIC_REPOSITORY=${ restic_abiotic_factor_repo }
-      RESTIC_PASSWORD=${ restic_abiotic_factor_password }
-      AWS_ACCESS_KEY_ID=${ restic_abiotic_factor_aws_access_key_id }
-      AWS_SECRET_ACCESS_KEY=${ restic_abiotic_factor_aws_secret_access_key }
+      RESTIC_REPOSITORY={{ restic_abiotic_factor_repo }}
+      RESTIC_PASSWORD={{ restic_abiotic_factor_password }}
+      AWS_ACCESS_KEY_ID={{ restic_abiotic_factor_aws_access_key_id }}
+      AWS_SECRET_ACCESS_KEY={{ restic_abiotic_factor_aws_secret_access_key }}
       GAME_NAME=abiotic-factor
       GAMEDATA_PATH=/gamedata
     permissions: '0600'
@@ -107,7 +107,7 @@ write_files:
         -H "Content-Type: application/json" \
         -X POST \
         --data "$json_message" \
-        "${ abiotic_factor_discord_channel_webhook }"
+        "{{ abiotic_factor_discord_channel_webhook }}"
 
 packages:
   - docker-ce
@@ -121,7 +121,7 @@ packages:
 runcmd:
   # Mount the persistent volume for game installation
   - mkdir -p /mnt/abiotic-factor-install
-  - mount -o discard,defaults /dev/disk/by-id/scsi-0HC_Volume_${ abiotic_factor_volume_id } /mnt/abiotic-factor-install
+  - mount -o discard,defaults /dev/disk/by-id/scsi-0HC_Volume_{{ abiotic_factor_volume_id }} /mnt/abiotic-factor-install
   - mkdir -p /mnt/abiotic-factor-install/steamcmd /mnt/abiotic-factor-install/steam /mnt/abiotic-factor-install/abiotic-factor
   - chown -R 1000:1000 /mnt/abiotic-factor-install
   - docker pull ghcr.io/strayer/game-server-deployment-discord-bot/abiotic-factor:latest
@@ -136,7 +136,7 @@ runcmd:
       --tmpfs /tmp \
       ghcr.io/strayer/game-server-deployment-discord-bot/backup:latest \
       restore-backup.sh
-  - BOT_MESSAGE="${ bot_server_started_message }" discord-notify
+  - BOT_MESSAGE="{{ bot_server_started_message }}" discord-notify
   - |
       docker run -d --read-only --network=host \
         -v /mnt/abiotic-factor-install/steamcmd:/opt/steamcmd \
@@ -144,19 +144,19 @@ runcmd:
         -v /mnt/abiotic-factor-install/abiotic-factor:/opt/abiotic-factor \
         -v /gamedata:/gamedata \
         --tmpfs /tmp:uid=1000 \
-        -e "SERVER_NAME=${ abiotic_factor_server_name }" \
-        -e "SERVER_PASSWORD=${ abiotic_factor_server_password }" \
-        -e "WORLD_SAVE_NAME=${ abiotic_factor_world_save_name }" \
-        -e "MAX_SERVER_PLAYERS=${ abiotic_factor_max_players }" \
-        -e "DISCORD_MAIN_CHANNEL_WEBHOOK=${ abiotic_factor_discord_channel_webhook }" \
+        -e "SERVER_NAME={{ abiotic_factor_server_name }}" \
+        -e "SERVER_PASSWORD={{ abiotic_factor_server_password }}" \
+        -e "WORLD_SAVE_NAME={{ abiotic_factor_world_save_name }}" \
+        -e "MAX_SERVER_PLAYERS={{ abiotic_factor_max_players }}" \
+        -e "DISCORD_MAIN_CHANNEL_WEBHOOK={{ abiotic_factor_discord_channel_webhook }}" \
         --name abiotic-factor-server \
         ghcr.io/strayer/game-server-deployment-discord-bot/abiotic-factor:latest
   - |
       docker run -d --read-only --network=host \
         -v /var/run/docker.sock:/var/run/docker.sock:ro \
         -e GAME_NAME=abiotic-factor \
-        -e DISCORD_WEBHOOK=${ abiotic_factor_discord_channel_webhook } \
-        -e SERVER_READY_MESSAGE="${ bot_server_ready_message }" \
+        -e DISCORD_WEBHOOK={{ abiotic_factor_discord_channel_webhook }} \
+        -e SERVER_READY_MESSAGE="{{ bot_server_ready_message }}" \
         --name server-launch-watcher \
         ghcr.io/strayer/game-server-deployment-discord-bot/server-launch-watcher:latest
 

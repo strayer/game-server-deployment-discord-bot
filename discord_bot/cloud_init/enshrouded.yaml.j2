@@ -84,10 +84,10 @@ write_files:
   - owner: root:root
     path: /env-backup
     content: |
-      RESTIC_REPOSITORY=${ restic_enshrouded_repo }
-      RESTIC_PASSWORD=${ restic_enshrouded_password }
-      AWS_ACCESS_KEY_ID=${ restic_enshrouded_aws_access_key_id }
-      AWS_SECRET_ACCESS_KEY=${ restic_enshrouded_aws_secret_access_key }
+      RESTIC_REPOSITORY={{ restic_enshrouded_repo }}
+      RESTIC_PASSWORD={{ restic_enshrouded_password }}
+      AWS_ACCESS_KEY_ID={{ restic_enshrouded_aws_access_key_id }}
+      AWS_SECRET_ACCESS_KEY={{ restic_enshrouded_aws_secret_access_key }}
       GAME_NAME=enshrouded
       GAMEDATA_PATH=/gamedata
     permissions: '0600'
@@ -107,7 +107,7 @@ write_files:
         -H "Content-Type: application/json" \
         -X POST \
         --data "$json_message" \
-        "${ enshrouded_discord_channel_webhook }"
+        "{{ enshrouded_discord_channel_webhook }}"
 
 packages:
   - docker-ce
@@ -134,7 +134,7 @@ runcmd:
       --tmpfs /tmp \
       ghcr.io/strayer/game-server-deployment-discord-bot/backup:latest \
       restore-backup.sh
-  - BOT_MESSAGE="${ bot_server_started_message }" discord-notify
+  - BOT_MESSAGE="{{ bot_server_started_message }}" discord-notify
   - |
       docker run -d --read-only --network=host \
         -v steamcmd:/opt/steamcmd \
@@ -142,17 +142,17 @@ runcmd:
         -v enshrouded:/opt/enshrouded \
         -v /gamedata:/gamedata \
         --tmpfs /tmp:uid=1000 \
-        -e "SERVER_NAME=${ enshrouded_server_name }" \
-        -e "SERVER_PASSWORD=${ enshrouded_server_password }" \
-        -e "DISCORD_MAIN_CHANNEL_WEBHOOK=${ enshrouded_discord_channel_webhook }" \
+        -e "SERVER_NAME={{ enshrouded_server_name }}" \
+        -e "SERVER_PASSWORD={{ enshrouded_server_password }}" \
+        -e "DISCORD_MAIN_CHANNEL_WEBHOOK={{ enshrouded_discord_channel_webhook }}" \
         --name enshrouded-server \
         ghcr.io/strayer/game-server-deployment-discord-bot/enshrouded:latest
   - |
       docker run -d --read-only --network=host \
         -v /var/run/docker.sock:/var/run/docker.sock:ro \
         -e GAME_NAME=enshrouded \
-        -e DISCORD_WEBHOOK=${ enshrouded_discord_channel_webhook } \
-        -e SERVER_READY_MESSAGE="${ bot_server_ready_message }" \
+        -e DISCORD_WEBHOOK={{ enshrouded_discord_channel_webhook }} \
+        -e SERVER_READY_MESSAGE="{{ bot_server_ready_message }}" \
         --name server-launch-watcher \
         ghcr.io/strayer/game-server-deployment-discord-bot/server-launch-watcher:latest
 

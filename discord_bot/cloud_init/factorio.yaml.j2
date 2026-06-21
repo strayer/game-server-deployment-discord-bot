@@ -84,10 +84,10 @@ write_files:
   - owner: root:root
     path: /env-backup
     content: |
-      RESTIC_REPOSITORY=${ restic_factorio_repo }
-      RESTIC_PASSWORD=${ restic_factorio_password }
-      AWS_ACCESS_KEY_ID=${ restic_factorio_aws_access_key_id }
-      AWS_SECRET_ACCESS_KEY=${ restic_factorio_aws_secret_access_key }
+      RESTIC_REPOSITORY={{ restic_factorio_repo }}
+      RESTIC_PASSWORD={{ restic_factorio_password }}
+      AWS_ACCESS_KEY_ID={{ restic_factorio_aws_access_key_id }}
+      AWS_SECRET_ACCESS_KEY={{ restic_factorio_aws_secret_access_key }}
       GAME_NAME=factorio
       GAMEDATA_PATH=/gamedata
     permissions: '0600'
@@ -107,7 +107,7 @@ write_files:
         -H "Content-Type: application/json" \
         -X POST \
         --data "$json_message" \
-        "${ factorio_discord_channel_webhook }"
+        "{{ factorio_discord_channel_webhook }}"
 
 packages:
   - docker-ce
@@ -131,13 +131,13 @@ runcmd:
       --tmpfs /tmp \
       ghcr.io/strayer/game-server-deployment-discord-bot/backup:latest \
       restore-backup.sh
-  - BOT_MESSAGE="${ bot_server_started_message }" discord-notify
+  - BOT_MESSAGE="{{ bot_server_started_message }}" discord-notify
   - |
       docker run -d --network=host \
         -v /gamedata:/factorio \
         --user 845 \
         -e LOAD_LATEST_SAVE=false \
-        -e SAVE_NAME=${ factorio_save_name } \
+        -e SAVE_NAME={{ factorio_save_name }} \
         -e UPDATE_MODS_ON_START=true \
         --name factorio-server \
         factoriotools/factorio:stable
@@ -145,8 +145,8 @@ runcmd:
       docker run -d --read-only --network=host \
         -v /var/run/docker.sock:/var/run/docker.sock:ro \
         -e GAME_NAME=factorio \
-        -e DISCORD_WEBHOOK=${ factorio_discord_channel_webhook } \
-        -e SERVER_READY_MESSAGE="${ bot_server_ready_message }" \
+        -e DISCORD_WEBHOOK={{ factorio_discord_channel_webhook }} \
+        -e SERVER_READY_MESSAGE="{{ bot_server_ready_message }}" \
         --name server-launch-watcher \
         ghcr.io/strayer/game-server-deployment-discord-bot/server-launch-watcher:latest
 

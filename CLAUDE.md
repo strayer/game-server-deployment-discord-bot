@@ -29,7 +29,7 @@ The core components are:
     -   `jobs.py`: rq jobs for start/stop; worker-side start-guard + Discord error reporting.
     -   `games.py`: per-game config — `ServerSpec` (server type, location, firewall ports, optional install volume, container stop strategy) + naming-convention helpers.
     -   `provisioner.py`: Hetzner API deploy/destroy.
-    -   `cloud_init/`: Jinja2 renderer (`__init__.py`) + per-game `*.tftpl` templates.
+    -   `cloud_init/`: Jinja2 renderer (`__init__.py`) + per-game `*.yaml.j2` templates.
     -   `remote_ops.py`: SSH stop + restic backup + rsync (the teardown step), keyed off the API-discovered IP and the shared `/sshkey/sshkey` key.
     -   `server_launch_watcher.py`: runs ON the game VM; posts the "ready" webhook.
     -   `db.py`: Redis helpers (cooldowns).
@@ -44,7 +44,7 @@ The core components are:
 4.  **Job Execution** — the `job-runner` picks up the job and runs it under the per-game Redis lock.
 5.  **Start-guard** — the worker checks `client.servers.get_by_name("<game>-server")`. If it already exists, the deploy is refused (a safe no-op) and a warning is posted to Discord — this fixes the old race where a second `/start` could destroy a live server.
 6.  **Provisioning (`provisioner.deploy`)** — ordered: validate the bot SSH key (adopt-or-recreate) and collect *all* project keys → resolve-or-create the install volume (volume games) → render cloud-init → delete-and-recreate the firewall → create the server (all project keys, firewall, inline volume) → wait for the create action and read the IPv4. Failures roll back best-effort and post a clear Discord message + Sentry event.
-7.  **Server Configuration (cloud-init)** — the rendered `discord_bot/cloud_init/<game>.tftpl` runs on the new VM: installs Docker, restores the restic backup, starts the game container, and launches the watcher.
+7.  **Server Configuration (cloud-init)** — the rendered `discord_bot/cloud_init/<game>.yaml.j2` runs on the new VM: installs Docker, restores the restic backup, starts the game container, and launches the watcher.
 8.  **Final Notification** — the on-VM `server_launch_watcher` posts the "server is ready" webhook once the game logs the readiness marker. `deploy()` does **not** wait for readiness.
 
 Teardown (`/stop` → `provisioner.destroy`) is ordered: SSH stop the container + restic backup **while the server is alive** → (volume games) ACPI shutdown, wait for "off", detach the volume → delete the server → delete the firewall. The shared bot SSH key and install volumes are never deleted.
@@ -66,7 +66,7 @@ Teardown (`/stop` → `provisioner.destroy`) is ordered: SSH stop the container 
 
 -   **Discord Bot / Provisioner:** Modify the Python files in `discord_bot/`.
 -   **Per-game infra:** Edit the game's `ServerSpec` in `discord_bot/games.py`.
--   **cloud-init:** Edit `discord_bot/cloud_init/<game>.tftpl` (Terraform-style `${ name }` placeholders; values come from `TF_VAR_<name>` env, `ServerSpec.cloud_init_defaults`, or the Game's bot messages).
+-   **cloud-init:** Edit `discord_bot/cloud_init/<game>.yaml.j2` (standard Jinja2 `{{ name }}` placeholders; values come from `TF_VAR_<name>` env, `ServerSpec.cloud_init_defaults`, or the Game's bot messages).
 -   **Docker:** Modify the `Dockerfile` or files in `docker/`.
 
 ### Linting and Formatting
@@ -75,7 +75,7 @@ Teardown (`/stop` → `provisioner.destroy`) is ordered: SSH stop the container 
 
 ### Testing
 
--   `uv run pytest` (unit tests under `tests/`, including the cloud-init render-all-five check). Manual end-to-end testing against Hetzner is still required for full deploys.
+-   `uv run pytest` (unit tests under `tests/`, including per-game cloud-init render snapshots in `tests/snapshots/`). Manual end-to-end testing against Hetzner is still required for full deploys.
 
 ## Architectural Patterns
 
@@ -86,7 +86,7 @@ Teardown (`/stop` → `provisioner.destroy`) is ordered: SSH stop the container 
 ## How to Add a New Game
 
 1.  Add a new `Game` (with its `ServerSpec`: location, firewall ports, optional install volume, stop strategy) to `discord_bot/games.py`.
-2.  Add `discord_bot/cloud_init/<game>.tftpl` and the matching `TF_VAR_*` entries to `job-runner.env.example`.
+2.  Add `discord_bot/cloud_init/<game>.yaml.j2` and the matching `TF_VAR_*` entries to `job-runner.env.example`.
 3.  Add slash commands in `discord_bot/bot.py` and `start_/stop_` job functions in `discord_bot/jobs.py`.
 4.  Add the game's readiness regex to `discord_bot/server_launch_watcher.py`.
 5.  Add the game server image build to `docker/` + `Dockerfile.steamcmd` and `.github/workflows/build-image.yml`.
