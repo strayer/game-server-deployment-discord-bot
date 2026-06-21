@@ -40,10 +40,11 @@ def _notify(game: games.Game, content: str) -> None:
         logger.warning("No Discord webhook configured for {g}", g=game.game_name)
         return
     try:
-        response = requests.post(webhook, json={"content": content})
+        response = requests.post(webhook, json={"content": content}, timeout=(5, 10))
         response.raise_for_status()
     except Exception as exc:  # noqa: BLE001 — notification must never crash the job
         logger.error("Failed to post Discord webhook for {g}: {e}", g=game.game_name, e=exc)
+        sentry_sdk.capture_exception(exc)
 
 
 def start_server(game: games.Game) -> None:
