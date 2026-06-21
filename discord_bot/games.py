@@ -145,7 +145,7 @@ ABIOTIC_FACTOR = Game(
         location="nbg1",
         firewall_ports=(("udp", "7777"), ("udp", "27015")),
         volume_size_gb=50,
-        volume_format="xfs",
+        volume_format="ext4",
         # max players is not in the environment; it was a Terraform default (6).
         cloud_init_defaults={"abiotic_factor_max_players": "6"},
     ),
@@ -162,7 +162,7 @@ WINDROSE = Game(
         location="nbg1",
         firewall_ports=(("tcp", "7777"), ("udp", "7777")),
         volume_size_gb=50,
-        volume_format="xfs",
+        volume_format="ext4",
         # Longer stop timeout so the wineserver -k graceful shutdown can flush the
         # RocksDB world save before SIGKILL.
         stop_strategy="stop-timeout",

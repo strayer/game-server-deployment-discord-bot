@@ -103,4 +103,4 @@ class TestServerSpec:
     def test_volume_games_have_size_and_format(self):
         for game in (games.ABIOTIC_FACTOR, games.WINDROSE):
             assert game.spec.volume_size_gb is not None
-            assert game.spec.volume_format == "xfs"
+            assert game.spec.volume_format == "ext4"

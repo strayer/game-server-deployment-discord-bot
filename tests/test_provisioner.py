@@ -174,7 +174,7 @@ class TestDeploy:
         client.volumes.create.assert_called_once()
         vkwargs = client.volumes.create.call_args.kwargs
         assert vkwargs["size"] == 50
-        assert vkwargs["format"] == "xfs"
+        assert vkwargs["format"] == "ext4"
         assert vkwargs["location"].name == "nbg1"
         # The create action was waited on.
         client.volumes.create.return_value.action.wait_until_finished.assert_called_once()
