@@ -2,13 +2,13 @@ This document provides guidance for AI agents on how to interact with and modify
 
 ## Project Overview
 
-This project is a Discord bot for managing game servers. It uses Python and Docker to automate the deployment and management of dedicated game servers for Valheim, Factorio, Enshrouded, Abiotic Factor, and Windrose on Hetzner Cloud. Servers are provisioned by calling the **Hetzner Cloud API directly** (the `hcloud` Python SDK) — there is no Terraform and no separate state database; the API itself is the source of truth, keyed by a fixed naming convention.
+This project is a Discord bot for managing game servers. It uses Python and Docker to automate the deployment and management of dedicated game servers for Valheim, Factorio, Enshrouded, Abiotic Factor, and Windrose on Hetzner Cloud. Servers are provisioned by calling the **Hetzner Cloud API directly** (the `hcloud` Python SDK). There is no separate state database; the API itself is the source of truth, keyed by a fixed naming convention.
 
 The core components are:
 
 -   **Discord Bot:** A Python application using the `hikari` and `lightbulb` libraries to interact with the Discord API. It provides slash commands to start and stop game servers.
 -   **Job Runner:** A Python application using `rq` (Redis Queue) to process background jobs, such as starting and stopping game servers.
--   **Provisioner:** `discord_bot/provisioner.py` — imperative provisioning against the Hetzner Cloud API (servers, firewalls, SSH keys, install volumes). Replaces the former per-game Terraform.
+-   **Provisioner:** `discord_bot/provisioner.py` — imperative provisioning against the Hetzner Cloud API (servers, firewalls, SSH keys, install volumes).
 -   **Docker:** The entire application is containerized using Docker and Docker Compose for development and production environments.
 
 ## Core Technologies
@@ -19,8 +19,8 @@ The core components are:
 -   **Redis:** Message broker for the `rq` job queue, and per-game locks / command cooldowns.
 -   **GitHub Actions:** CI/CD — builds/pushes Docker images and lints Python.
 
-> **No DNS.** Servers are reached by IP (used only for occasional SSH debug + the
-> readiness webhook). There is no Cloudflare provider, A record, or rDNS PTR.
+> Servers are reached by IP — used only for occasional SSH debug and the
+> readiness webhook.
 
 ## Project Structure
 
@@ -79,9 +79,9 @@ Teardown (`/stop` → `provisioner.destroy`) is ordered: SSH stop the container 
 
 ## Architectural Patterns
 
--   **Microservices:** Separate Discord bot and job-runner services.
+-   **Microservices:** Separate Discord bot and job-runner services. The split keeps infrastructure-critical credentials (the Hetzner token, restic/S3 keys, the bot SSH key) out of the internet-facing Discord-bot process, so a compromise of the bot does not directly expose them — they live only in the job-runner.
 -   **Asynchronous Processing:** An `rq` job queue keeps the bot responsive while long deploys run in the background.
--   **API as state:** No state DB and no Terraform — every resource is named by convention (`<game>-server`, `<game>-firewall`, the shared `discord-bot` SSH key, `<game>-install` volumes), so the Hetzner API is queried directly for what is deployed. Ownership is by name: the bot only manages its own named resources and never deletes install volumes or unrelated SSH keys.
+-   **API as state:** No state DB — every resource is named by convention (`<game>-server`, `<game>-firewall`, the shared `discord-bot` SSH key, `<game>-install` volumes), so the Hetzner API is queried directly for what is deployed. Ownership is by name: the bot only manages its own named resources and never deletes install volumes or unrelated SSH keys.
 
 ## How to Add a New Game
 

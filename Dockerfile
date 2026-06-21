@@ -47,8 +47,7 @@ ENV \
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Provisioning now talks to the Hetzner API directly (hcloud SDK); Terraform is gone.
-# openssh-client + rsync are still needed for the SSH stop/restic-backup teardown step
+# openssh-client + rsync power the SSH stop / restic-backup teardown step
 # (discord_bot/remote_ops.py).
 RUN apt-get update && \
   apt-get install --no-install-recommends -y ca-certificates openssh-client rsync && \
@@ -58,9 +57,6 @@ WORKDIR /app
 
 COPY --from=build /opt/.venv/ /opt/.venv/
 COPY --from=build /app/ /app/
-
-# cloud-init templates ship with the package (discord_bot/cloud_init/*.yaml.j2,
-# copied via `COPY --from=build /app/` above).
 
 CMD [ "rq", "worker", "-c", "discord_bot.sentry", "--with-scheduler" ]
 
