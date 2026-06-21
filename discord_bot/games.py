@@ -2,32 +2,27 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-# Firewall port spec: (protocol, port). ``protocol`` is "tcp" or "udp"; ``port``
-# is a single port ("7777") or an inclusive range ("15636-15637"). ICMP and TCP/22
-# are always added by the firewall builder, so they are NOT listed here.
-PortRule = tuple[str, str]
+# Firewall port spec: (protocol, port). ``port`` is a single port ("7777") or an
+# inclusive range ("15636-15637") — hence a string, not an int. ICMP and TCP/22 are
+# always added by the firewall builder, so they are NOT listed here.
+PortRule = tuple[Literal["tcp", "udp"], str]
 
 
 @dataclass(frozen=True)
 class ServerSpec:
-    """Per-game infrastructure parameters for direct Hetzner API provisioning.
-
-    These values replace the per-game ``terraform/<game>/main.tf`` definitions.
-    """
+    """Per-game infrastructure parameters for direct Hetzner API provisioning."""
 
     # Hetzner server type (vCPU/RAM tier).
     server_type: str = "ccx23"
-    # Hetzner location. PER-GAME: factorio is "fsn1", the others "nbg1". Preserve!
+    # Hetzner location.
     location: str = "nbg1"
-    # debian-12 x86, matching the previous `data.hcloud_image`.
     image: str = "debian-12"
     image_architecture: str = "x86"
-    # Game ports (ICMP + TCP/22 are added automatically — do not list them here).
     firewall_ports: tuple[PortRule, ...] = ()
 
     # Volume-backed games only (None otherwise). The volume is resolved by name and
@@ -42,7 +37,6 @@ class ServerSpec:
     cloud_init_defaults: Mapping[str, str] = field(default_factory=dict)
 
     # How destroy() stops the game container over SSH before the restic backup.
-    # Mirrors the per-game branches in the old teardown.sh:
     #   "stop"         -> docker stop <container>
     #   "sigint-wait"  -> docker kill --signal=SIGINT <container> && docker wait <container>
     #   "stop-timeout" -> docker stop -t <stop_timeout> <container>   (graceful flush)
@@ -72,8 +66,6 @@ class Game:
         self.bot_message_started = bot_message_started
         self.bot_message_finished = bot_message_finished
         self.spec = spec
-
-    # --- Naming convention: the Hetzner API is the source of truth, keyed by name ---
 
     @property
     def server_name(self) -> str:
@@ -120,7 +112,6 @@ FACTORIO = Game(
     bot_message_started="Factorio is shutting down...",
     bot_message_finished="Factorio server has been destroyed and savegame backed up 🧨💥",
     spec=ServerSpec(
-        # PER-GAME: factorio runs in fsn1 (not nbg1). Preserve this.
         location="fsn1",
         firewall_ports=(("udp", "60001-60999"), ("udp", "34197")),
     ),
