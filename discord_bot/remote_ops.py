@@ -22,7 +22,18 @@ if TYPE_CHECKING:
 
 # Shared bot SSH private key (see provisioner / cutover notes).
 SSH_KEY_PATH = "/sshkey/sshkey"
-_SSH_BASE_OPTS = ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"]
+# BatchMode + ConnectTimeout keep SSH/rsync non-interactive: a bad key or an
+# unreachable host fails fast instead of hanging the job runner on an auth prompt.
+_SSH_BASE_OPTS = [
+    "-o",
+    "StrictHostKeyChecking=no",
+    "-o",
+    "UserKnownHostsFile=/dev/null",
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=15",
+]
 BACKUP_IMAGE = "ghcr.io/strayer/game-server-deployment-discord-bot/backup:latest"
 
 # Seconds to wait after issuing the container stop before backing up (matches the
@@ -81,10 +92,8 @@ def pull_gamedata(game: Game, ip: str) -> None:
     backup_path = os.environ.get("BACKUP_PATH", "/backup")
     dest_dir = pathlib.Path(backup_path) / game.game_name / "current"
     dest_dir.mkdir(parents=True, exist_ok=True)
-    rsync_ssh = (
-        f"ssh -i {SSH_KEY_PATH} -o StrictHostKeyChecking=no "
-        "-o UserKnownHostsFile=/dev/null"
-    )
+    # Reuse the same non-interactive opts as _ssh_command so rsync can't hang either.
+    rsync_ssh = "ssh -i " + SSH_KEY_PATH + " " + " ".join(_SSH_BASE_OPTS)
     subprocess.run(
         [
             "rsync",
