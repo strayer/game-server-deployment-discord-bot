@@ -8,18 +8,13 @@ SSH key, and never deletes ``<game>-install`` volumes (adopt/attach/detach only)
 
 from __future__ import annotations
 
-import contextlib
 import dataclasses
-import ipaddress
 import os
-import socket
 import subprocess
 import time
 from pathlib import Path
 
 import backoff
-import requests
-import urllib3.util.connection
 from hcloud import APIException, Client
 from hcloud.firewalls.domain import FirewallRule
 from hcloud.locations.domain import Location
@@ -40,14 +35,8 @@ if TYPE_CHECKING:
 BOT_SSH_KEY_NAME = "discord-bot"
 BOT_SSH_KEY_PATH = remote_ops.SSH_KEY_PATH
 
-# Inbound firewall allows ICMP + the per-game game ports from anywhere; SSH (port
-# 22) is restricted to the bot's own egress IPv4 (see `_detect_egress_ipv4`).
+# Inbound firewall always allows ICMP + SSH on top of the per-game game ports.
 _ANY_SOURCE = ["0.0.0.0/0", "::/0"]
-
-# Egress-IP detection for the SSH firewall rule. The URL must return JSON with an
-# ``ip`` field; ``BOT_EGRESS_IP`` short-circuits detection entirely.
-_EGRESS_IP_URL_DEFAULT = "https://ifconfig.co/json"
-_EGRESS_IP_TIMEOUT = (5, 10)  # (connect, read) seconds
 
 # API error codes worth retrying (the SDK already retries rate limits internally;
 # `backoff` adds a little resilience for transient conflicts/locks).
@@ -85,65 +74,6 @@ class AlreadyDeployedError(ProvisionError):
             f"{game.game_display_name} server is already running or starting "
             f"({game.server_name} exists); refusing to deploy.",
         )
-
-
-@contextlib.contextmanager
-def _force_ipv4_dns():
-    """Force outbound connections to resolve to IPv4 only, so a dual-stack host
-    can't reach the egress-IP service over IPv6 and report its IPv6 address."""
-    original = urllib3.util.connection.allowed_gai_family
-    urllib3.util.connection.allowed_gai_family = lambda: socket.AF_INET
-    try:
-        yield
-    finally:
-        urllib3.util.connection.allowed_gai_family = original
-
-
-def _validate_ipv4(value: str, *, source: str) -> str:
-    try:
-        parsed = ipaddress.ip_address(value)
-    except ValueError as exc:
-        raise ProvisionError(
-            "firewall",
-            f"egress IP {value!r} from {source} is not a valid IP.",
-            cause=exc,
-        ) from exc
-    if not isinstance(parsed, ipaddress.IPv4Address):
-        raise ProvisionError(
-            "firewall",
-            f"egress IP {value!r} from {source} is not IPv4; refusing to open SSH "
-            f"to an IPv6 source.",
-        )
-    return str(parsed)
-
-
-def _detect_egress_ipv4() -> str:
-    """Return the bot's public IPv4 for the SSH firewall rule.
-
-    ``BOT_EGRESS_IP`` short-circuits detection. Otherwise GET ``BOT_EGRESS_IP_URL``
-    (default ifconfig.co), forcing IPv4, and read its ``ip`` field. Fail-closed:
-    any error raises ``ProvisionError`` so a deploy/teardown aborts rather than
-    silently opening SSH to the world.
-    """
-    override = os.environ.get("BOT_EGRESS_IP")
-    if override:
-        return _validate_ipv4(override, source="BOT_EGRESS_IP")
-
-    url = os.environ.get("BOT_EGRESS_IP_URL", _EGRESS_IP_URL_DEFAULT)
-    try:
-        with _force_ipv4_dns():
-            resp = requests.get(
-                url, timeout=_EGRESS_IP_TIMEOUT, headers={"Accept": "application/json"}
-            )
-        resp.raise_for_status()
-        ip = resp.json()["ip"]
-    except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
-        raise ProvisionError(
-            "firewall",
-            f"could not detect bot egress IPv4 from {url!r}: {exc}",
-            cause=exc,
-        ) from exc
-    return _validate_ipv4(ip, source=url)
 
 
 @dataclasses.dataclass
@@ -217,16 +147,7 @@ class Provisioner:
             logger.info("Generating bot SSH keypair at {path}", path=self.ssh_key_path)
             priv.parent.mkdir(parents=True, exist_ok=True)
             subprocess.run(
-                [
-                    "ssh-keygen",
-                    "-t",
-                    "ed25519",
-                    "-f",
-                    self.ssh_key_path,
-                    "-q",
-                    "-N",
-                    "",
-                ],
+                ["ssh-keygen", "-t", "ed25519", "-f", self.ssh_key_path, "-q", "-N", ""],
                 check=True,
             )
         return pub.read_text(encoding="utf-8").strip()
@@ -251,9 +172,7 @@ class Provisioner:
             self.client.ssh_keys.create(name=BOT_SSH_KEY_NAME, public_key=local_pub)
             return
 
-        if self._pubkey_material(existing.public_key) == self._pubkey_material(
-            local_pub
-        ):
+        if self._pubkey_material(existing.public_key) == self._pubkey_material(local_pub):
             return  # adopt — already correct
 
         # Mismatch: only safe to recreate when no managed server depends on the key.
@@ -306,9 +225,7 @@ class Provisioner:
 
     # ---------------------------------------------------------------- firewall
 
-    def _build_firewall_rules(
-        self, game: Game, ssh_source_ips: list[str]
-    ) -> list[FirewallRule]:
+    def _build_firewall_rules(self, game: Game) -> list[FirewallRule]:
         rules = [
             FirewallRule(
                 direction=FirewallRule.DIRECTION_IN,
@@ -319,7 +236,7 @@ class Provisioner:
                 direction=FirewallRule.DIRECTION_IN,
                 protocol=FirewallRule.PROTOCOL_TCP,
                 port="22",
-                source_ips=list(ssh_source_ips),
+                source_ips=list(_ANY_SOURCE),
             ),
         ]
         for protocol, port in game.spec.firewall_ports:
@@ -351,35 +268,15 @@ class Provisioner:
     def _recreate_firewall(self, game: Game) -> BoundFirewall:
         """Delete any stale firewall (we only get here with no live server) and
         create a fresh one — never diff/update."""
-        # Detect the egress IP first: a failure here aborts before we touch anything.
-        ssh_source_ips = [f"{_detect_egress_ipv4()}/32"]
         self._delete_firewall_if_present(game)
         logger.info("Creating firewall {name}", name=game.firewall_name)
         resp = self.client.firewalls.create(
-            name=game.firewall_name,
-            rules=self._build_firewall_rules(game, ssh_source_ips),
+            name=game.firewall_name, rules=self._build_firewall_rules(game)
         )
         for action in resp.actions or []:
             if action is not None:
                 action.wait_until_finished()
         return resp.firewall
-
-    def _refresh_firewall_ssh_rule(self, game: Game) -> None:
-        """Re-point the SSH rule at the *current* egress IP before teardown SSH.
-
-        The firewall is built at deploy time and reused until /stop, so if the bot's
-        egress IP changed in between, teardown SSH/rsync would be blocked. No-op if
-        the firewall is already gone; fail-closed if detection fails."""
-        firewall = self._get_firewall(game)
-        if firewall is None:
-            return
-        ssh_source_ips = [f"{_detect_egress_ipv4()}/32"]
-        logger.info("Refreshing SSH firewall rule for {name}", name=game.firewall_name)
-        for action in firewall.set_rules(
-            self._build_firewall_rules(game, ssh_source_ips)
-        ):
-            if action is not None:
-                action.wait_until_finished()
 
     # -------------------------------------------------------------------- image
 
@@ -462,11 +359,7 @@ class Provisioner:
                 "deploy",
                 f"Hetzner API error while deploying {game.game_display_name}: "
                 f"{exc.message}"
-                + (
-                    f" (correlation_id={exc.correlation_id})"
-                    if exc.correlation_id
-                    else ""
-                ),
+                + (f" (correlation_id={exc.correlation_id})" if exc.correlation_id else ""),
                 cause=exc,
             ) from exc
 
@@ -488,9 +381,7 @@ class Provisioner:
                 logger.error("Rollback server delete failed: {e}", e=exc)
         if firewall is not None:
             try:
-                logger.warning(
-                    "Rolling back: deleting firewall {n}", n=game.firewall_name
-                )
+                logger.warning("Rolling back: deleting firewall {n}", n=game.firewall_name)
                 self.client.firewalls.delete(firewall)
             except Exception as exc:  # noqa: BLE001 — best-effort
                 logger.error("Rollback firewall delete failed: {e}", e=exc)
@@ -523,10 +414,6 @@ class Provisioner:
             return
 
         ipv4 = server.public_net.ipv4.ip
-
-        # Make sure the SSH rule still allows our (possibly changed) egress IP before
-        # we rely on SSH for the backup.
-        self._refresh_firewall_ssh_rule(game)
 
         # 1. Stop the container and back up while the server is still alive.
         try:

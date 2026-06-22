@@ -26,7 +26,6 @@ from discord_bot.provisioner import (
 
 LOCAL_PUBKEY = "ssh-ed25519 AAAALOCAL bot"
 SERVER_IP = "203.0.113.10"
-EGRESS_IP = "198.51.100.7"
 
 
 def _action() -> MagicMock:
@@ -46,9 +45,7 @@ def _make_server(status: str = "running") -> MagicMock:
     return server
 
 
-def _make_volume(
-    volume_id: int = 42, attached_server: object | None = None
-) -> MagicMock:
+def _make_volume(volume_id: int = 42, attached_server: object | None = None) -> MagicMock:
     volume = MagicMock(name="volume")
     volume.id = volume_id
     volume.name = "windrose-install"
@@ -109,7 +106,6 @@ def wired():
         patch.object(prov.cloud_init, "render", return_value="#cloud-config\n"),
         patch.object(prov.remote_ops, "stop_and_backup") as stop_and_backup,
         patch.object(prov.time, "sleep", return_value=None),
-        patch.object(prov, "_detect_egress_ipv4", return_value=EGRESS_IP),
     ):
         # Expose the stop_and_backup mock for destroy tests.
         client._stop_and_backup = stop_and_backup
@@ -161,9 +157,7 @@ class TestDeploy:
         existing_vol = _make_volume(volume_id=7, attached_server=None)
         client.volumes.get_by_name.return_value = existing_vol
 
-        with patch.object(
-            prov.cloud_init, "render", return_value="#cloud-config\n"
-        ) as render:
+        with patch.object(prov.cloud_init, "render", return_value="#cloud-config\n") as render:
             provisioner.deploy(WINDROSE)
 
         client.volumes.create.assert_not_called()
@@ -293,34 +287,6 @@ class TestFirewall:
         # FACTORIO spec ports.
         assert ("udp", "60001-60999") in protos
         assert ("udp", "34197") in protos
-
-    def test_ssh_rule_restricted_to_egress_ip(self, wired):
-        provisioner, client = wired
-
-        provisioner._recreate_firewall(FACTORIO)
-
-        rules = client.firewalls.create.call_args.kwargs["rules"]
-        by_key = {(r.protocol, getattr(r, "port", None)): r for r in rules}
-        # SSH is locked to the bot's egress IPv4...
-        assert by_key[("tcp", "22")].source_ips == [f"{EGRESS_IP}/32"]
-        # ...while ICMP and the game ports stay open to the world.
-        assert by_key[("icmp", None)].source_ips == prov._ANY_SOURCE
-        assert by_key[("udp", "34197")].source_ips == prov._ANY_SOURCE
-
-    def test_egress_detection_failure_aborts_deploy(self, wired):
-        provisioner, client = wired
-
-        with patch.object(
-            prov,
-            "_detect_egress_ipv4",
-            side_effect=ProvisionError("firewall", "no egress IP"),
-        ):
-            with pytest.raises(ProvisionError) as excinfo:
-                provisioner.deploy(FACTORIO)
-
-        assert excinfo.value.step == "firewall"
-        # Fail-closed: no server is created when the egress IP can't be determined.
-        client.servers.create.assert_not_called()
 
 
 # ----------------------------------------------------------------------- destroy
