@@ -1,3 +1,2 @@
 [tools]
 python = "3.11"
-"aqua:hashicorp/terraform" = "1.10.5"

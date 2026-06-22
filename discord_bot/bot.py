@@ -62,7 +62,9 @@ async def cooldown(ctx: lightbulb.SlashContext, seconds: int) -> bool:
             ttl=ttl,
         )
 
-        await ctx.respond(f"ERROR: This command is on cooldown! Please retry later. ({ttl}s left)")
+        await ctx.respond(
+            f"ERROR: This command is on cooldown! Please retry later. ({ttl}s left)"
+        )
         return False
 
     db.set_cooldown(ctx.command.name, seconds)
@@ -211,7 +213,9 @@ async def start_abiotic_factor(ctx: lightbulb.SlashContext) -> None:
 
     log_command(ctx)
 
-    await ctx.respond("Abiotic Factor start trigger received, this may take a few minutes")
+    await ctx.respond(
+        "Abiotic Factor start trigger received, this may take a few minutes"
+    )
 
     jobs.get_queue().enqueue(jobs.start_abiotic_factor_server)
 

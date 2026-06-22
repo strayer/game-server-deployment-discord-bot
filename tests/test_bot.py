@@ -128,7 +128,7 @@ class TestCooldown:
             os.environ,
             {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": "fake"},
         ):
-            from discord_bot import bot, db
+            from discord_bot import bot
 
             import importlib
 

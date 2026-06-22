@@ -1,138 +1,10 @@
-import pathlib
-import subprocess
-from unittest.mock import MagicMock, patch
-
-import pytest
+"""Tests for per-game configuration (discord_bot.games)."""
 
 from discord_bot import games
 
 
-class TestGameStartServer:
-    """Tests for the Game.start_server method."""
-
-    def test_start_server_calls_correct_script(self):
-        with patch("discord_bot.games.subprocess.run") as mock_run:
-            games.VALHEIM.start_server()
-
-            mock_run.assert_called_once()
-            call_args = mock_run.call_args
-            script_path = call_args[0][0][0]
-
-            # Verify it calls start.sh from the scripts directory
-            assert script_path.name == "start.sh"
-            assert "scripts" in str(script_path)
-
-    def test_start_server_passes_correct_env_variables(self):
-        with patch("discord_bot.games.subprocess.run") as mock_run:
-            games.VALHEIM.start_server()
-
-            call_kwargs = mock_run.call_args[1]
-            env = call_kwargs["env"]
-
-            # Check game-specific env vars
-            assert env["GAME_NAME"] == "valheim"
-            assert env["GAME_DISPLAY_NAME"] == "Valheim"
-            assert "BOT_MESSAGE_SERVER_STARTED" in env
-            assert "BOT_MESSAGE_SERVER_READY" in env
-
-    def test_start_server_uses_check_true(self):
-        with patch("discord_bot.games.subprocess.run") as mock_run:
-            games.VALHEIM.start_server()
-
-            call_kwargs = mock_run.call_args[1]
-            assert call_kwargs["check"] is True
-
-
-class TestGameStopServer:
-    """Tests for the Game.stop_server method."""
-
-    def test_stop_server_calls_correct_script(self):
-        with patch("discord_bot.games.subprocess.run") as mock_run:
-            games.VALHEIM.stop_server()
-
-            mock_run.assert_called_once()
-            call_args = mock_run.call_args
-            script_path = call_args[0][0][0]
-
-            # Verify it calls teardown.sh from the scripts directory
-            assert script_path.name == "teardown.sh"
-            assert "scripts" in str(script_path)
-
-    def test_stop_server_passes_correct_env_variables(self):
-        with patch("discord_bot.games.subprocess.run") as mock_run:
-            games.VALHEIM.stop_server()
-
-            call_kwargs = mock_run.call_args[1]
-            env = call_kwargs["env"]
-
-            # Check game-specific env vars
-            assert env["GAME_NAME"] == "valheim"
-            assert env["GAME_DISPLAY_NAME"] == "Valheim"
-            assert "BOT_MESSAGE_STARTED" in env
-            assert "BOT_MESSAGE_FINISHED" in env
-
-    def test_stop_server_uses_check_true(self):
-        with patch("discord_bot.games.subprocess.run") as mock_run:
-            games.VALHEIM.stop_server()
-
-            call_kwargs = mock_run.call_args[1]
-            assert call_kwargs["check"] is True
-
-
-class TestErrorHandling:
-    """Tests for error handling in game server operations."""
-
-    def test_start_server_raises_on_subprocess_failure(self):
-        with patch("discord_bot.games.subprocess.run") as mock_run:
-            mock_run.side_effect = subprocess.CalledProcessError(
-                returncode=1, cmd=["start.sh"]
-            )
-
-            with pytest.raises(subprocess.CalledProcessError):
-                games.VALHEIM.start_server()
-
-    def test_stop_server_raises_on_subprocess_failure(self):
-        with patch("discord_bot.games.subprocess.run") as mock_run:
-            mock_run.side_effect = subprocess.CalledProcessError(
-                returncode=1, cmd=["teardown.sh"]
-            )
-
-            with pytest.raises(subprocess.CalledProcessError):
-                games.VALHEIM.stop_server()
-
-    def test_start_server_logs_error_on_failure(self):
-        with patch("discord_bot.games.subprocess.run") as mock_run:
-            with patch("discord_bot.games.logger") as mock_logger:
-                mock_run.side_effect = subprocess.CalledProcessError(
-                    returncode=1, cmd=["start.sh"]
-                )
-
-                with pytest.raises(subprocess.CalledProcessError):
-                    games.VALHEIM.start_server()
-
-                mock_logger.error.assert_called_once()
-                error_msg = mock_logger.error.call_args[0][0]
-                assert "Failed to start" in error_msg
-                assert "Valheim" in error_msg
-
-    def test_stop_server_logs_error_on_failure(self):
-        with patch("discord_bot.games.subprocess.run") as mock_run:
-            with patch("discord_bot.games.logger") as mock_logger:
-                mock_run.side_effect = subprocess.CalledProcessError(
-                    returncode=1, cmd=["teardown.sh"]
-                )
-
-                with pytest.raises(subprocess.CalledProcessError):
-                    games.VALHEIM.stop_server()
-
-                mock_logger.error.assert_called_once()
-                error_msg = mock_logger.error.call_args[0][0]
-                assert "Failed to stop" in error_msg
-                assert "Valheim" in error_msg
-
-
 class TestGameInstances:
-    """Tests to verify game instances are configured correctly."""
+    """Verify game instances are configured correctly."""
 
     def test_valheim_game_configuration(self):
         assert games.VALHEIM.game_name == "valheim"
@@ -153,3 +25,66 @@ class TestGameInstances:
     def test_windrose_game_configuration(self):
         assert games.WINDROSE.game_name == "windrose"
         assert games.WINDROSE.game_display_name == "Windrose"
+
+    def test_all_games_registry(self):
+        assert set(games.ALL_GAMES) == {
+            "valheim",
+            "factorio",
+            "enshrouded",
+            "abiotic-factor",
+            "windrose",
+        }
+
+
+class TestNamingConvention:
+    """The Hetzner API is keyed by these names; they must be stable."""
+
+    def test_server_name(self):
+        for name, game in games.ALL_GAMES.items():
+            assert game.server_name == f"{name}-server"
+
+    def test_firewall_name(self):
+        for name, game in games.ALL_GAMES.items():
+            assert game.firewall_name == f"{name}-firewall"
+
+    def test_tf_var_prefix_underscores_hyphens(self):
+        assert games.ABIOTIC_FACTOR.tf_var_prefix == "abiotic_factor"
+        assert games.VALHEIM.tf_var_prefix == "valheim"
+
+
+class TestServerSpec:
+    """Per-game infra parameters that replace terraform/<game>/main.tf."""
+
+    def test_firewall_ports_match_terraform(self):
+        assert games.VALHEIM.spec.firewall_ports == (("udp", "2456-2457"),)
+        assert games.FACTORIO.spec.firewall_ports == (
+            ("udp", "60001-60999"),
+            ("udp", "34197"),
+        )
+        assert games.ENSHROUDED.spec.firewall_ports == (
+            ("udp", "15636-15637"),
+            ("tcp", "15636-15637"),
+        )
+        assert games.ABIOTIC_FACTOR.spec.firewall_ports == (
+            ("udp", "7777"),
+            ("udp", "27015"),
+        )
+        assert games.WINDROSE.spec.firewall_ports == (
+            ("tcp", "7777"),
+            ("udp", "7777"),
+        )
+
+    def test_volume_backed_games(self):
+        assert games.ABIOTIC_FACTOR.spec.has_volume
+        assert games.ABIOTIC_FACTOR.volume_name == "abiotic-factor-install"
+        assert games.WINDROSE.spec.has_volume
+        assert games.WINDROSE.volume_name == "windrose-install"
+
+    def test_non_volume_games(self):
+        for game in (games.VALHEIM, games.FACTORIO, games.ENSHROUDED):
+            assert not game.spec.has_volume
+
+    def test_volume_games_have_size_and_format(self):
+        for game in (games.ABIOTIC_FACTOR, games.WINDROSE):
+            assert game.spec.volume_size_gb is not None
+            assert game.spec.volume_format == "ext4"

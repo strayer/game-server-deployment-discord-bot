@@ -84,10 +84,10 @@ write_files:
   - owner: root:root
     path: /env-backup
     content: |
-      RESTIC_REPOSITORY=${ restic_windrose_repo }
-      RESTIC_PASSWORD=${ restic_windrose_password }
-      AWS_ACCESS_KEY_ID=${ restic_windrose_aws_access_key_id }
-      AWS_SECRET_ACCESS_KEY=${ restic_windrose_aws_secret_access_key }
+      RESTIC_REPOSITORY=s3:https://s3.example.tld/restic-fake
+      RESTIC_PASSWORD=fake-password
+      AWS_ACCESS_KEY_ID=FAKEACCESSKEYID
+      AWS_SECRET_ACCESS_KEY=fake-secret-access-key
       GAME_NAME=windrose
       GAMEDATA_PATH=/gamedata
     permissions: '0600'
@@ -107,7 +107,7 @@ write_files:
         -H "Content-Type: application/json" \
         -X POST \
         --data "$json_message" \
-        "${ windrose_discord_channel_webhook }"
+        "https://discord.example/api/webhooks/fake"
 
 packages:
   - docker-ce
@@ -121,7 +121,7 @@ packages:
 runcmd:
   # Mount the persistent volume for game installation
   - mkdir -p /mnt/windrose-install
-  - mount -o discard,defaults /dev/disk/by-id/scsi-0HC_Volume_${ windrose_volume_id } /mnt/windrose-install
+  - mount -o discard,defaults /dev/disk/by-id/scsi-0HC_Volume_98765 /mnt/windrose-install
   - mkdir -p /mnt/windrose-install/steamcmd /mnt/windrose-install/steam /mnt/windrose-install/windrose
   - chown -R 1000:1000 /mnt/windrose-install
   - docker pull ghcr.io/strayer/game-server-deployment-discord-bot/windrose:latest
@@ -136,7 +136,7 @@ runcmd:
       --tmpfs /tmp \
       ghcr.io/strayer/game-server-deployment-discord-bot/backup:latest \
       restore-backup.sh
-  - BOT_MESSAGE="${ bot_server_started_message }" discord-notify
+  - BOT_MESSAGE="Windrose has been installed and save state backup restored, starting game server..." discord-notify
   - |
       docker run -d --read-only --network=host \
         -v /mnt/windrose-install/steamcmd:/opt/steamcmd \
@@ -144,9 +144,9 @@ runcmd:
         -v /mnt/windrose-install/windrose:/opt/windrose \
         -v /gamedata:/gamedata \
         --tmpfs /tmp:uid=1000 \
-        -e "SERVER_NAME=${ windrose_server_name }" \
-        -e "SERVER_PASSWORD=${ windrose_server_password }" \
-        -e "MAX_PLAYERS=${ windrose_max_players }" \
+        -e "SERVER_NAME=fake-windrose_server_name" \
+        -e "SERVER_PASSWORD=fake-password" \
+        -e "MAX_PLAYERS=fake-windrose_max_players" \
         -e "USE_DIRECT_CONNECTION=true" \
         -e "SERVER_PORT=7777" \
         --name windrose-server \
@@ -155,8 +155,8 @@ runcmd:
       docker run -d --read-only --network=host \
         -v /var/run/docker.sock:/var/run/docker.sock:ro \
         -e GAME_NAME=windrose \
-        -e DISCORD_WEBHOOK=${ windrose_discord_channel_webhook } \
-        -e SERVER_READY_MESSAGE="${ bot_server_ready_message }" \
+        -e DISCORD_WEBHOOK=https://discord.example/api/webhooks/fake \
+        -e SERVER_READY_MESSAGE="Windrose server is ready!" \
         --name server-launch-watcher \
         ghcr.io/strayer/game-server-deployment-discord-bot/server-launch-watcher:latest
 
