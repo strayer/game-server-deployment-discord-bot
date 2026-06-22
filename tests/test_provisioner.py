@@ -45,7 +45,9 @@ def _make_server(status: str = "running") -> MagicMock:
     return server
 
 
-def _make_volume(volume_id: int = 42, attached_server: object | None = None) -> MagicMock:
+def _make_volume(
+    volume_id: int = 42, attached_server: object | None = None
+) -> MagicMock:
     volume = MagicMock(name="volume")
     volume.id = volume_id
     volume.name = "windrose-install"
@@ -157,7 +159,9 @@ class TestDeploy:
         existing_vol = _make_volume(volume_id=7, attached_server=None)
         client.volumes.get_by_name.return_value = existing_vol
 
-        with patch.object(prov.cloud_init, "render", return_value="#cloud-config\n") as render:
+        with patch.object(
+            prov.cloud_init, "render", return_value="#cloud-config\n"
+        ) as render:
             provisioner.deploy(WINDROSE)
 
         client.volumes.create.assert_not_called()

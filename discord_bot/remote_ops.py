@@ -75,7 +75,9 @@ def stop_container(game: Game, ip: str) -> None:
 
 def run_remote_backup(game: Game, ip: str) -> None:
     """Run the restic backup container on the server (tag: after-session)."""
-    logger.info("Backing up {game} gamedata on {ip}", game=game.game_display_name, ip=ip)
+    logger.info(
+        "Backing up {game} gamedata on {ip}", game=game.game_display_name, ip=ip
+    )
     remote_command = (
         "docker run --rm --read-only "
         "-v /gamedata:/gamedata "

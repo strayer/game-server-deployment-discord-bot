@@ -43,7 +43,9 @@ def _notify(game: games.Game, content: str) -> None:
         response = requests.post(webhook, json={"content": content}, timeout=(5, 10))
         response.raise_for_status()
     except Exception as exc:  # noqa: BLE001 — notification must never crash the job
-        logger.error("Failed to post Discord webhook for {g}: {e}", g=game.game_name, e=exc)
+        logger.error(
+            "Failed to post Discord webhook for {g}: {e}", g=game.game_name, e=exc
+        )
         sentry_sdk.capture_exception(exc)
 
 
@@ -66,7 +68,9 @@ def start_server(game: games.Game) -> None:
             )
             return
         except ProvisionError as exc:
-            logger.error("Failed to start {g} server: {e}", g=game.game_display_name, e=exc)
+            logger.error(
+                "Failed to start {g} server: {e}", g=game.game_display_name, e=exc
+            )
             sentry_sdk.capture_exception(exc.cause or exc)
             _notify(
                 game,
@@ -76,7 +80,9 @@ def start_server(game: games.Game) -> None:
         except Exception as exc:  # noqa: BLE001
             logger.exception("Unexpected error starting {g}", g=game.game_display_name)
             sentry_sdk.capture_exception(exc)
-            _notify(game, f"❌ Unexpected error starting {game.game_display_name}: {exc}")
+            _notify(
+                game, f"❌ Unexpected error starting {game.game_display_name}: {exc}"
+            )
             return
 
         logger.info(
@@ -96,7 +102,9 @@ def stop_server(game: games.Game) -> None:
         try:
             prov.destroy(game)
         except ProvisionError as exc:
-            logger.error("Failed to stop {g} server: {e}", g=game.game_display_name, e=exc)
+            logger.error(
+                "Failed to stop {g} server: {e}", g=game.game_display_name, e=exc
+            )
             sentry_sdk.capture_exception(exc.cause or exc)
             _notify(
                 game,
@@ -106,7 +114,9 @@ def stop_server(game: games.Game) -> None:
         except Exception as exc:  # noqa: BLE001
             logger.exception("Unexpected error stopping {g}", g=game.game_display_name)
             sentry_sdk.capture_exception(exc)
-            _notify(game, f"❌ Unexpected error stopping {game.game_display_name}: {exc}")
+            _notify(
+                game, f"❌ Unexpected error stopping {game.game_display_name}: {exc}"
+            )
             return
 
         _notify(game, game.bot_message_finished)

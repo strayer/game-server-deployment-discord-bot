@@ -147,7 +147,16 @@ class Provisioner:
             logger.info("Generating bot SSH keypair at {path}", path=self.ssh_key_path)
             priv.parent.mkdir(parents=True, exist_ok=True)
             subprocess.run(
-                ["ssh-keygen", "-t", "ed25519", "-f", self.ssh_key_path, "-q", "-N", ""],
+                [
+                    "ssh-keygen",
+                    "-t",
+                    "ed25519",
+                    "-f",
+                    self.ssh_key_path,
+                    "-q",
+                    "-N",
+                    "",
+                ],
                 check=True,
             )
         return pub.read_text(encoding="utf-8").strip()
@@ -172,7 +181,9 @@ class Provisioner:
             self.client.ssh_keys.create(name=BOT_SSH_KEY_NAME, public_key=local_pub)
             return
 
-        if self._pubkey_material(existing.public_key) == self._pubkey_material(local_pub):
+        if self._pubkey_material(existing.public_key) == self._pubkey_material(
+            local_pub
+        ):
             return  # adopt — already correct
 
         # Mismatch: only safe to recreate when no managed server depends on the key.
@@ -359,7 +370,11 @@ class Provisioner:
                 "deploy",
                 f"Hetzner API error while deploying {game.game_display_name}: "
                 f"{exc.message}"
-                + (f" (correlation_id={exc.correlation_id})" if exc.correlation_id else ""),
+                + (
+                    f" (correlation_id={exc.correlation_id})"
+                    if exc.correlation_id
+                    else ""
+                ),
                 cause=exc,
             ) from exc
 
@@ -381,7 +396,9 @@ class Provisioner:
                 logger.error("Rollback server delete failed: {e}", e=exc)
         if firewall is not None:
             try:
-                logger.warning("Rolling back: deleting firewall {n}", n=game.firewall_name)
+                logger.warning(
+                    "Rolling back: deleting firewall {n}", n=game.firewall_name
+                )
                 self.client.firewalls.delete(firewall)
             except Exception as exc:  # noqa: BLE001 — best-effort
                 logger.error("Rollback firewall delete failed: {e}", e=exc)
