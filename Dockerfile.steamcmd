@@ -1,4 +1,4 @@
-FROM debian:bookworm AS steamcmd
+FROM debian:bookworm-20260623 AS steamcmd
 
 RUN apt-get update && apt-get full-upgrade -y && rm -rf /var/lib/apt/lists
 
