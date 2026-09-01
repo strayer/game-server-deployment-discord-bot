@@ -10,7 +10,9 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": ["^Dockerfile\\.backup$"],
+      "managerFilePatterns": [
+        "/^Dockerfile\\.backup$/"
+      ],
       "matchStrings": ["ARG RESTIC_VERSION=(?<currentValue>[\\d.]+)"],
       "depNameTemplate": "restic/restic",
       "datasourceTemplate": "github-releases",
