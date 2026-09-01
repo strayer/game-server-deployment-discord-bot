@@ -12,8 +12,8 @@ import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-import backoff
 import requests
+import tenacity
 from docker.errors import NotFound
 from loguru import logger
 
@@ -91,7 +91,12 @@ def reverse_dns(ip: str) -> str | None:
         return None
 
 
-@backoff.on_exception(backoff.expo, NotFound, max_time=60)
+@tenacity.retry(
+    retry=tenacity.retry_if_exception_type(NotFound),
+    wait=tenacity.wait_random_exponential(multiplier=1),
+    stop=tenacity.stop_after_delay(60),
+    reraise=True,
+)
 def get_container(client: docker.DockerClient, container_name: str) -> Container:
     return client.containers.get(container_name)  # type:ignore
 
