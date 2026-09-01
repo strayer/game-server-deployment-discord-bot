@@ -1,4 +1,4 @@
-FROM debian:bookworm AS steamcmd
+FROM debian:trixie AS steamcmd
 
 RUN apt-get update && apt-get full-upgrade -y && rm -rf /var/lib/apt/lists
 
