@@ -10,14 +10,17 @@ import re
 import socket
 import sys
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import backoff
 import requests
 from docker.errors import NotFound
-from docker.models.containers import Container
 from loguru import logger
 
 import docker
+
+if TYPE_CHECKING:
+    from docker.models.containers import Container
 
 
 @dataclass(frozen=True)
