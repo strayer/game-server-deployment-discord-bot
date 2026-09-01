@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROTON_URL="https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton${PROTON_VERSION}/GE-Proton${PROTON_VERSION}.tar.gz"
-
 if [ ! -e "$STEAMCMD_PATH/steamcmd.sh" ]; then
   echo "--> Installing steamcmd"
 
@@ -27,6 +25,10 @@ mkdir -p /home/steam/.steam
 [ ! -L "${STEAM_SDK32_PATH}/steamservice.so" ] && ln -s "${STEAM_SDK32_PATH}/steamclient.so" "${STEAM_SDK32_PATH}/steamservice.so"
 
 if [ "$USE_PROTON" -eq 1 ]; then
+  # Only Proton games set PROTON_VERSION; resolving the URL here keeps `set -u`
+  # from aborting native games like Valheim.
+  PROTON_URL="https://github.com/GloriousEggroll/proton-ge-custom/releases/download/GE-Proton${PROTON_VERSION}/GE-Proton${PROTON_VERSION}.tar.gz"
+
   if [ ! -e "${STEAMCMD_PATH}/compatibilitytools.d/GE-Proton${PROTON_VERSION}" ]; then
     echo "--> Installing proton"
     mkdir -p "$STEAMCMD_PATH/compatibilitytools.d/"

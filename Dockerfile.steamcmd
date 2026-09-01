@@ -1,4 +1,4 @@
-FROM debian:bookworm AS steamcmd
+FROM debian:trixie AS steamcmd
 
 RUN apt-get update && apt-get full-upgrade -y && rm -rf /var/lib/apt/lists
 
@@ -12,12 +12,16 @@ RUN apt-get update && \
   locale-gen && \
   rm -rf /var/lib/apt/lists
 
+# python3 is required by the GE-Proton launcher script (#!/usr/bin/env python3).
+# On bookworm it came in transitively via winbind -> samba-common-bin; on trixie
+# that is only a Recommends, which --no-install-recommends drops.
 RUN dpkg --add-architecture i386 && \
   apt-get update && \
   apt-get install --no-install-recommends -y \
   lib32gcc-s1 curl ca-certificates \
   jq bind9-dnsutils \
   winbind dbus libfreetype6 procps \
+  python3 \
   && \
   rm -rf /var/lib/apt/lists
 
