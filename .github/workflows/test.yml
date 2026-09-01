@@ -26,6 +26,15 @@ jobs:
       - name: ruff format --check
         run: uvx ruff format --check .
 
+  shellcheck:
+    name: Lint (shellcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: shellcheck all tracked shell scripts
+        run: git ls-files '*.sh' | xargs --no-run-if-empty shellcheck
+
   test:
     name: Test (pytest)
     runs-on: ubuntu-latest

@@ -53,7 +53,9 @@ echo "Proton wrapper started with PID: $proton_pid"
 # Wait for the game server to be fully running
 timeout=0
 while [ $timeout -lt 11 ]; do
+  # shellcheck disable=SC2009 # deliberate: match the Proton child's truncated comm name
   if ps -e | grep "[e]nshrouded_serv" > /dev/null 2>&1; then
+    # shellcheck disable=SC2009
     enshrouded_pid=$(ps -e | grep "[e]nshrouded_serv" | awk '{print $1}' | head -n1)
     echo "Enshrouded server discovered with PID: $enshrouded_pid"
     break
@@ -70,6 +72,7 @@ done
 wait "$proton_pid"
 
 # After Proton exits, ensure the game process has also fully stopped
+# shellcheck disable=SC2009 # deliberate: match the Proton child's truncated comm name
 if ps -e | grep "[e]nshrouded_serv" > /dev/null 2>&1; then
   echo "Waiting for Enshrouded server process to fully exit..."
   tail --pid="$enshrouded_pid" -f /dev/null

@@ -33,14 +33,14 @@ while true; do
   exit_code=${PIPESTATUS[0]}
   set -e
 
-  if [ $exit_code -eq 0 ]; then
+  if [ "$exit_code" -eq 0 ]; then
     echo "--> Game installed successfully"
     exit 0
   fi
 
-  if [ $attempt -ge $MAX_ATTEMPTS ]; then
+  if [ $attempt -ge "$MAX_ATTEMPTS" ]; then
     echo "--> Failed after $attempt attempts (last exit code: $exit_code)"
-    exit $exit_code
+    exit "$exit_code"
   fi
 
   echo "--> steamcmd attempt $attempt failed (exit code: $exit_code), retrying..."
