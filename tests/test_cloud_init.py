@@ -69,9 +69,11 @@ def test_render_matches_snapshot(game, snapshot):
 
 def test_missing_env_var_raises_clear_error():
     """A placeholder with no TF_VAR_ value fails, naming the missing var."""
-    with patch.dict(os.environ, {}, clear=True):
-        with pytest.raises(cloud_init.CloudInitError) as exc:
-            cloud_init.render(games.FACTORIO)
+    with (
+        patch.dict(os.environ, {}, clear=True),
+        pytest.raises(cloud_init.CloudInitError) as exc,
+    ):
+        cloud_init.render(games.FACTORIO)
     assert "TF_VAR_factorio_save_name" in str(exc.value)
 
 
@@ -80,9 +82,11 @@ def test_missing_env_var_raises_clear_error():
 )
 def test_volume_game_requires_volume_id(game):
     """The ``*_volume_id`` path fails when no volume id is supplied."""
-    with patch.dict(os.environ, _env_for(game), clear=True):
-        with pytest.raises(cloud_init.CloudInitError) as exc:
-            cloud_init.render(game, volume_id=None)
+    with (
+        patch.dict(os.environ, _env_for(game), clear=True),
+        pytest.raises(cloud_init.CloudInitError) as exc,
+    ):
+        cloud_init.render(game, volume_id=None)
     assert "volume_id" in str(exc.value)
 
 

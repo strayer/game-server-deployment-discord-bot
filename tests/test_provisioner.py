@@ -20,8 +20,8 @@ from discord_bot.games import ABIOTIC_FACTOR, ALL_GAMES, FACTORIO, WINDROSE
 from discord_bot.provisioner import (
     AlreadyDeployedError,
     DeployResult,
-    ProvisionError,
     Provisioner,
+    ProvisionError,
 )
 
 LOCAL_PUBKEY = "ssh-ed25519 AAAALOCAL bot"
@@ -179,9 +179,10 @@ class TestDeploy:
 
         client.volumes.create.assert_called_once()
         vkwargs = client.volumes.create.call_args.kwargs
-        assert vkwargs["size"] == 50
-        assert vkwargs["format"] == "ext4"
-        assert vkwargs["location"].name == "nbg1"
+        # Pin the spec->API wiring, not the literal size (which is tuned over time).
+        assert vkwargs["size"] == WINDROSE.spec.volume_size_gb
+        assert vkwargs["format"] == WINDROSE.spec.volume_format
+        assert vkwargs["location"].name == WINDROSE.spec.location
         # The create action was waited on.
         client.volumes.create.return_value.action.wait_until_finished.assert_called_once()
         # The freshly created volume is what gets attached.
@@ -199,6 +200,44 @@ class TestDeploy:
 
         assert not isinstance(excinfo.value, AlreadyDeployedError)
         # Rollback deleted the firewall it created.
+        created_firewall = client.firewalls.create.return_value.firewall
+        client.firewalls.delete.assert_called_once_with(created_firewall)
+
+    def test_rollback_deletes_created_server_on_post_create_failure(self, wired):
+        # Failure AFTER the server exists (waiting for the boot action) must roll
+        # back the server itself, not just the firewall — otherwise the start-guard
+        # blocks every future /start against an orphaned half-deployed server.
+        provisioner, client = wired
+        created_server = client.servers.create.return_value.server
+        client.servers.create.return_value.action.wait_until_finished.side_effect = (
+            APIException(code="x", message="boot failed", details=None)
+        )
+
+        with pytest.raises(ProvisionError):
+            provisioner.deploy(FACTORIO)
+
+        created_server.delete.assert_called_once()
+        created_server.delete.return_value.wait_until_finished.assert_called_once()
+        created_firewall = client.firewalls.create.return_value.firewall
+        client.firewalls.delete.assert_called_once_with(created_firewall)
+
+    def test_failing_rollback_does_not_mask_the_original_error(self, wired):
+        # Rollback is best-effort: if deleting the half-created server fails too,
+        # the ORIGINAL deploy error must still surface (and the firewall cleanup
+        # must still be attempted).
+        provisioner, client = wired
+        created_server = client.servers.create.return_value.server
+        client.servers.create.return_value.action.wait_until_finished.side_effect = (
+            APIException(code="x", message="boot failed", details=None)
+        )
+        created_server.delete.side_effect = APIException(
+            code="y", message="delete also failed", details=None
+        )
+
+        with pytest.raises(ProvisionError) as excinfo:
+            provisioner.deploy(FACTORIO)
+
+        assert "boot failed" in str(excinfo.value)
         created_firewall = client.firewalls.create.return_value.firewall
         client.firewalls.delete.assert_called_once_with(created_firewall)
 
@@ -331,12 +370,26 @@ class TestDestroy:
         volume = _make_volume(volume_id=42, attached_server=MagicMock())
         client.volumes.get_by_name.return_value = volume
 
+        # Record the actual call order — each step assumes the previous one
+        # (backup needs the live OS, detach needs the box off, delete last).
+        order = []
+
+        def record(name, ret=None):
+            def _side_effect(*args, **kwargs):
+                order.append(name)
+                return ret
+
+            return _side_effect
+
+        client._stop_and_backup.side_effect = record("backup")
+        server.shutdown.side_effect = record("shutdown", _action())
+        volume.detach.side_effect = record("detach", _action())
+        server.delete.side_effect = record("delete", _action())
+
         provisioner.destroy(WINDROSE)
 
         client._stop_and_backup.assert_called_once_with(WINDROSE, SERVER_IP)
-        server.shutdown.assert_called_once()
-        volume.detach.assert_called_once()
-        server.delete.assert_called_once()
+        assert order == ["backup", "shutdown", "detach", "delete"]
         # Install volumes are sacred: detach only, never delete.
         client.volumes.delete.assert_not_called()
         volume.delete.assert_not_called()
@@ -367,15 +420,126 @@ class TestDestroy:
         assert excinfo.value.step == "backup"
         server.delete.assert_not_called()
 
+    def test_backup_failure_on_volume_game_touches_nothing(self, wired):
+        # The save-critical branch: a failed backup must abort BEFORE shutdown,
+        # detach or delete — the world data on the volume stays untouched.
+        provisioner, client = wired
+        server = _make_server()
+        client.servers.get_by_name.return_value = server
+        volume = _make_volume(volume_id=42, attached_server=MagicMock())
+        client.volumes.get_by_name.return_value = volume
+        client._stop_and_backup.side_effect = subprocess.CalledProcessError(1, "ssh")
+
+        with pytest.raises(ProvisionError) as excinfo:
+            provisioner.destroy(WINDROSE)
+
+        assert excinfo.value.step == "backup"
+        server.shutdown.assert_not_called()
+        volume.detach.assert_not_called()
+        server.delete.assert_not_called()
+        client.firewalls.delete.assert_not_called()
+
+    def test_already_detached_volume_skips_detach(self, wired):
+        # Idempotency during recovery from a partial teardown: a volume that is
+        # not attached must not be detached again, and the teardown continues.
+        provisioner, client = wired
+        server = _make_server(status="off")
+        client.servers.get_by_name.return_value = server
+        volume = _make_volume(volume_id=42, attached_server=None)
+        client.volumes.get_by_name.return_value = volume
+
+        provisioner.destroy(WINDROSE)
+
+        volume.detach.assert_not_called()
+        server.delete.assert_called_once()
+
+
+# ------------------------------------------------------------------------- retries
+
+
+class TestRetry:
+    """The @_retry policy matters for dependency updates: hcloud/backoff changes
+    that alter which errors retry would change operational behavior unnoticed."""
+
+    def test_retryable_api_error_is_retried(self, wired):
+        provisioner, client = wired
+        client.servers.get_by_name.side_effect = [
+            APIException(code="conflict", message="locked", details=None),
+            _make_server(),
+        ]
+
+        # backoff sleeps between attempts via the real time module.
+        with patch("time.sleep"):
+            assert provisioner.server_ip(FACTORIO) == SERVER_IP
+
+        assert client.servers.get_by_name.call_count == 2
+
+    def test_non_retryable_api_error_raises_immediately(self, wired):
+        provisioner, client = wired
+        client.servers.get_by_name.side_effect = APIException(
+            code="unauthorized", message="bad token", details=None
+        )
+
+        with patch("time.sleep"), pytest.raises(APIException):
+            provisioner.server_ip(FACTORIO)
+
+        assert client.servers.get_by_name.call_count == 1
+
+
+# -------------------------------------------------------------------- queries / keys
+
+
+class TestQueries:
+    def test_server_ip_when_deployed(self, wired):
+        provisioner, client = wired
+        client.servers.get_by_name.return_value = _make_server()
+
+        assert provisioner.server_ip(FACTORIO) == SERVER_IP
+        assert provisioner.is_deployed(FACTORIO) is True
+
+    def test_server_ip_when_absent(self, wired):
+        provisioner, client = wired
+        client.servers.get_by_name.return_value = None
+
+        assert provisioner.server_ip(FACTORIO) is None
+        assert provisioner.is_deployed(FACTORIO) is False
+
+
+class TestReadLocalPubkey:
+    def test_existing_pubkey_is_read_and_stripped(self, tmp_path):
+        key_path = tmp_path / "sshkey"
+        (tmp_path / "sshkey.pub").write_text(f"{LOCAL_PUBKEY}\n")
+        provisioner = Provisioner(MagicMock(), ssh_key_path=str(key_path))
+
+        assert provisioner._read_local_pubkey() == LOCAL_PUBKEY
+
+    def test_missing_keypair_is_generated(self, tmp_path):
+        key_path = tmp_path / "keys" / "sshkey"
+        provisioner = Provisioner(MagicMock(), ssh_key_path=str(key_path))
+
+        def fake_keygen(cmd, check):
+            (tmp_path / "keys" / "sshkey.pub").write_text(f"{LOCAL_PUBKEY}\n")
+
+        with patch.object(prov.subprocess, "run", side_effect=fake_keygen) as run:
+            assert provisioner._read_local_pubkey() == LOCAL_PUBKEY
+
+        cmd = run.call_args.args[0]
+        assert cmd[0] == "ssh-keygen"
+        assert "ed25519" in cmd
+        # The parent dir must exist before ssh-keygen writes into it.
+        assert (tmp_path / "keys").is_dir()
+
 
 # ------------------------------------------------------------------- client_from_env
 
 
 class TestClientFromEnv:
     def test_missing_token_raises_config_error(self):
-        with patch.dict("os.environ", {}, clear=True):
-            with pytest.raises(ProvisionError) as excinfo:
-                prov.client_from_env()
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            pytest.raises(ProvisionError) as excinfo,
+        ):
+            prov.client_from_env()
         assert excinfo.value.step == "config"
 
     @pytest.mark.parametrize("var", ["HCLOUD_TOKEN", "TF_VAR_hcloud_token"])

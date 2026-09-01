@@ -3,6 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from discord_bot import games
+
 
 class TestIsAuthorizedChannel:
     """Tests for the is_authorized_channel function."""
@@ -13,10 +15,10 @@ class TestIsAuthorizedChannel:
             {"GUILD_ID": "999", "CHANNEL_IDS": "123,456,789", "BOT_TOKEN": "fake"},
         ):
             # Need to reimport after patching env vars
-            from discord_bot import bot
-
             # Reload to pick up new env vars
             import importlib
+
+            from discord_bot import bot
 
             importlib.reload(bot)
 
@@ -29,9 +31,9 @@ class TestIsAuthorizedChannel:
             os.environ,
             {"GUILD_ID": "999", "CHANNEL_IDS": "123,456", "BOT_TOKEN": "fake"},
         ):
-            from discord_bot import bot
-
             import importlib
+
+            from discord_bot import bot
 
             importlib.reload(bot)
 
@@ -58,9 +60,9 @@ class TestAuthorize:
             os.environ,
             {"GUILD_ID": "999", "CHANNEL_IDS": "999", "BOT_TOKEN": "fake"},
         ):
-            from discord_bot import bot
-
             import importlib
+
+            from discord_bot import bot
 
             importlib.reload(bot)
 
@@ -79,9 +81,9 @@ class TestAuthorize:
             os.environ,
             {"GUILD_ID": "999", "CHANNEL_IDS": "123,456", "BOT_TOKEN": "fake"},
         ):
-            from discord_bot import bot
-
             import importlib
+
+            from discord_bot import bot
 
             importlib.reload(bot)
 
@@ -110,9 +112,9 @@ class TestCooldown:
             os.environ,
             {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": "fake"},
         ):
-            from discord_bot import bot
-
             import importlib
+
+            from discord_bot import bot
 
             importlib.reload(bot)
 
@@ -128,9 +130,9 @@ class TestCooldown:
             os.environ,
             {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": "fake"},
         ):
-            from discord_bot import bot
-
             import importlib
+
+            from discord_bot import bot
 
             importlib.reload(bot)
 
@@ -152,9 +154,9 @@ class TestCooldown:
             os.environ,
             {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": "fake"},
         ):
-            from discord_bot import bot
-
             import importlib
+
+            from discord_bot import bot
 
             importlib.reload(bot)
 
@@ -171,8 +173,22 @@ class TestCooldown:
             mock_context.respond.assert_not_called()
 
 
+# (command name, bot handler attr, jobs function attr) for every slash command,
+# derived from the game registry so a new game is covered automatically.
+ALL_COMMANDS = [
+    (
+        f"{action}-{game.game_name}",
+        f"{action}_{game.tf_var_prefix}",
+        f"{action}_{game.tf_var_prefix}_server",
+    )
+    for game in games.ALL_GAMES.values()
+    for action in ("start", "stop")
+]
+
+
 class TestQueueIntegrity:
-    """Tests for verifying correct jobs are enqueued."""
+    """Every slash command must enqueue exactly its own job — and only when the
+    channel is authorized and the command is off cooldown."""
 
     @pytest.fixture
     def mock_context(self):
@@ -181,134 +197,65 @@ class TestQueueIntegrity:
         ctx.author = MagicMock()
         ctx.author.username = "testuser"
         ctx.command = MagicMock()
-        ctx.command.name = "start-valheim"
         ctx.respond = AsyncMock()
         ctx.member = MagicMock()
         ctx.member.display_name = "Test User"
         return ctx
 
-    async def test_start_valheim_enqueues_correct_job(
-        self, mock_context, patch_db_redis
-    ):
-        mock_context.command.name = "start-valheim"
-
+    @pytest.fixture
+    def bot_module(self):
         with patch.dict(
             os.environ,
             {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": "fake"},
         ):
-            from discord_bot import bot, jobs
-
             import importlib
 
+            from discord_bot import bot
+
             importlib.reload(bot)
+            yield bot
 
-            mock_queue = MagicMock()
-            with patch.object(jobs, "get_queue", return_value=mock_queue):
-                await bot.start_valheim(mock_context)
-
-                mock_queue.enqueue.assert_called_once_with(jobs.start_valheim_server)
-
-    async def test_stop_valheim_enqueues_correct_job(
-        self, mock_context, patch_db_redis
+    @pytest.mark.parametrize(("command", "handler", "job"), ALL_COMMANDS)
+    async def test_command_enqueues_its_job(
+        self, mock_context, patch_db_redis, bot_module, command, handler, job
     ):
-        mock_context.command.name = "stop-valheim"
+        from discord_bot import jobs
 
-        with patch.dict(
-            os.environ,
-            {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": "fake"},
-        ):
-            from discord_bot import bot, jobs
+        mock_context.command.name = command
 
-            import importlib
+        mock_queue = MagicMock()
+        with patch.object(jobs, "get_queue", return_value=mock_queue):
+            await getattr(bot_module, handler)(mock_context)
 
-            importlib.reload(bot)
+        mock_queue.enqueue.assert_called_once_with(getattr(jobs, job))
 
-            mock_queue = MagicMock()
-            with patch.object(jobs, "get_queue", return_value=mock_queue):
-                await bot.stop_valheim(mock_context)
-
-                mock_queue.enqueue.assert_called_once_with(jobs.stop_valheim_server)
-
-    async def test_start_factorio_enqueues_correct_job(
-        self, mock_context, patch_db_redis
+    @pytest.mark.parametrize(("command", "handler", "job"), ALL_COMMANDS)
+    async def test_unauthorized_channel_enqueues_nothing(
+        self, mock_context, patch_db_redis, bot_module, command, handler, job
     ):
-        mock_context.command.name = "start-factorio"
+        from discord_bot import jobs
 
-        with patch.dict(
-            os.environ,
-            {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": "fake"},
-        ):
-            from discord_bot import bot, jobs
+        mock_context.command.name = command
+        mock_context.channel_id = 666  # not in CHANNEL_IDS
 
-            import importlib
+        mock_queue = MagicMock()
+        with patch.object(jobs, "get_queue", return_value=mock_queue):
+            await getattr(bot_module, handler)(mock_context)
 
-            importlib.reload(bot)
+        mock_queue.enqueue.assert_not_called()
+        mock_context.respond.assert_called_once()
 
-            mock_queue = MagicMock()
-            with patch.object(jobs, "get_queue", return_value=mock_queue):
-                await bot.start_factorio(mock_context)
-
-                mock_queue.enqueue.assert_called_once_with(jobs.start_factorio_server)
-
-    async def test_start_enshrouded_enqueues_correct_job(
-        self, mock_context, patch_db_redis
+    @pytest.mark.parametrize(("command", "handler", "job"), ALL_COMMANDS)
+    async def test_command_on_cooldown_enqueues_nothing(
+        self, mock_context, patch_db_redis, bot_module, command, handler, job
     ):
-        mock_context.command.name = "start-enshrouded"
+        from discord_bot import jobs
 
-        with patch.dict(
-            os.environ,
-            {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": "fake"},
-        ):
-            from discord_bot import bot, jobs
+        mock_context.command.name = command
+        patch_db_redis.set(f"cooldown_{command}", 1, ex=60)
 
-            import importlib
+        mock_queue = MagicMock()
+        with patch.object(jobs, "get_queue", return_value=mock_queue):
+            await getattr(bot_module, handler)(mock_context)
 
-            importlib.reload(bot)
-
-            mock_queue = MagicMock()
-            with patch.object(jobs, "get_queue", return_value=mock_queue):
-                await bot.start_enshrouded(mock_context)
-
-                mock_queue.enqueue.assert_called_once_with(jobs.start_enshrouded_server)
-
-    async def test_start_windrose_enqueues_correct_job(
-        self, mock_context, patch_db_redis
-    ):
-        mock_context.command.name = "start-windrose"
-
-        with patch.dict(
-            os.environ,
-            {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": "fake"},
-        ):
-            from discord_bot import bot, jobs
-
-            import importlib
-
-            importlib.reload(bot)
-
-            mock_queue = MagicMock()
-            with patch.object(jobs, "get_queue", return_value=mock_queue):
-                await bot.start_windrose(mock_context)
-
-                mock_queue.enqueue.assert_called_once_with(jobs.start_windrose_server)
-
-    async def test_stop_windrose_enqueues_correct_job(
-        self, mock_context, patch_db_redis
-    ):
-        mock_context.command.name = "stop-windrose"
-
-        with patch.dict(
-            os.environ,
-            {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": "fake"},
-        ):
-            from discord_bot import bot, jobs
-
-            import importlib
-
-            importlib.reload(bot)
-
-            mock_queue = MagicMock()
-            with patch.object(jobs, "get_queue", return_value=mock_queue):
-                await bot.stop_windrose(mock_context)
-
-                mock_queue.enqueue.assert_called_once_with(jobs.stop_windrose_server)
+        mock_queue.enqueue.assert_not_called()

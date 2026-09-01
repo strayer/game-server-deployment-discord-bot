@@ -75,7 +75,7 @@ Teardown (`/stop` → `provisioner.destroy`) is ordered: SSH stop the container 
 
 ### Testing
 
--   `uv run pytest` (unit tests under `tests/`, including per-game cloud-init render snapshots in `tests/snapshots/`). Manual end-to-end testing against Hetzner is still required for full deploys.
+-   `uv run --extra test pytest` (unit tests under `tests/`, including per-game cloud-init render snapshots in `tests/snapshots/`). Manual end-to-end testing against Hetzner is still required for full deploys.
 
 ## Architectural Patterns
 

@@ -49,3 +49,4 @@ __pycache__/
 
 chart/charts
 .aider*
+.coverage
