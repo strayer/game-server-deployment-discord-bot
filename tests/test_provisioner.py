@@ -458,7 +458,7 @@ class TestDestroy:
 
 
 class TestRetry:
-    """The @_retry policy matters for dependency updates: hcloud/backoff changes
+    """The @_retry policy matters for dependency updates: hcloud/tenacity changes
     that alter which errors retry would change operational behavior unnoticed."""
 
     def test_retryable_api_error_is_retried(self, wired):
@@ -468,7 +468,7 @@ class TestRetry:
             _make_server(),
         ]
 
-        # backoff sleeps between attempts via the real time module.
+        # tenacity sleeps between attempts via the real time module.
         with patch("time.sleep"):
             assert provisioner.server_ip(FACTORIO) == SERVER_IP
 
