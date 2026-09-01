@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import backoff
+import tenacity
 from hcloud import APIException, Client
 from hcloud.firewalls.domain import FirewallRule
 from hcloud.locations.domain import Location
@@ -39,20 +39,19 @@ BOT_SSH_KEY_PATH = remote_ops.SSH_KEY_PATH
 _ANY_SOURCE = ["0.0.0.0/0", "::/0"]
 
 # API error codes worth retrying (the SDK already retries rate limits internally;
-# `backoff` adds a little resilience for transient conflicts/locks).
+# `tenacity` adds a little resilience for transient conflicts/locks).
 _RETRYABLE_CODES = {"rate_limit_exceeded", "conflict", "locked"}
 
 
-def _is_not_retryable(exc: Exception) -> bool:
-    return not (isinstance(exc, APIException) and exc.code in _RETRYABLE_CODES)
+def _is_retryable(exc: BaseException) -> bool:
+    return isinstance(exc, APIException) and exc.code in _RETRYABLE_CODES
 
 
-_retry = backoff.on_exception(
-    backoff.expo,
-    APIException,
-    max_tries=4,
-    giveup=_is_not_retryable,
-    logger=None,
+_retry = tenacity.retry(
+    retry=tenacity.retry_if_exception(_is_retryable),
+    wait=tenacity.wait_random_exponential(multiplier=1),
+    stop=tenacity.stop_after_attempt(4),
+    reraise=True,
 )
 
 
