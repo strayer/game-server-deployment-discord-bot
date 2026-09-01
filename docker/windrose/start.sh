@@ -56,7 +56,7 @@ shutdown() {
   WINEPREFIX="$WINEPREFIX" "$WINESERVER" -k >/dev/null 2>&1 || true
   # Stop the log tail only after the server has been signalled, so shutdown/save
   # lines still reach stdout.
-  [ -n "$tail_pid" ] && kill "$tail_pid" 2>/dev/null || true
+  if [ -n "$tail_pid" ]; then kill "$tail_pid" 2>/dev/null || true; fi
 }
 
 # Launch the server via Proton. Args after the exe are passed to the game.
@@ -153,4 +153,4 @@ tail_pid=$!
 
 wait "$server_pid"
 
-[ -n "$tail_pid" ] && kill "$tail_pid" 2>/dev/null || true
+if [ -n "$tail_pid" ]; then kill "$tail_pid" 2>/dev/null || true; fi
