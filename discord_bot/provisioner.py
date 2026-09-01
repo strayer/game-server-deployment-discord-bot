@@ -13,6 +13,7 @@ import os
 import subprocess
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import backoff
 from hcloud import APIException, Client
@@ -24,12 +25,11 @@ from loguru import logger
 
 from discord_bot import cloud_init, remote_ops
 from discord_bot.games import ALL_GAMES, Game
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from hcloud.volumes.client import BoundVolume
-    from hcloud.ssh_keys.client import BoundSSHKey
     from hcloud.firewalls.client import BoundFirewall
+    from hcloud.ssh_keys.client import BoundSSHKey
+    from hcloud.volumes.client import BoundVolume
 
 # The single, bot-managed SSH key shared by all games.
 BOT_SSH_KEY_NAME = "discord-bot"

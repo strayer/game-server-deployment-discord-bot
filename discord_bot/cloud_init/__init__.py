@@ -14,10 +14,9 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from jinja2 import Environment, StrictUndefined, TemplateError, meta
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from discord_bot.games import Game

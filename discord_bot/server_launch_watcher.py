@@ -1,3 +1,10 @@
+"""Runs ON the game VM: watches the game container's logs and posts the "server
+is ready" Discord webhook once the per-game readiness marker appears.
+
+Only ``main()`` touches the environment, Docker and the network — importing this
+module is side-effect free so the per-game config and matching logic are testable.
+"""
+
 import os
 import re
 import socket
@@ -6,52 +13,50 @@ from dataclasses import dataclass
 
 import backoff
 import requests
+from docker.errors import NotFound
+from docker.models.containers import Container
 from loguru import logger
 
 import docker
-from docker.errors import NotFound
-from docker.models.containers import Container
 
-# Specify the environment variables for the container name and regex pattern
-GAME_NAME = os.environ.get("GAME_NAME")
-DISCORD_WEBHOOK = os.environ.get("DISCORD_WEBHOOK")
-SERVER_READY_MESSAGE = os.environ.get("SERVER_READY_MESSAGE")
 
-if DISCORD_WEBHOOK is None or DISCORD_WEBHOOK == "":
-    logger.error("DISCORD_WEBHOOK environment variable required to function")
-    sys.exit(-1)
+@dataclass(frozen=True)
+class WatchConfig:
+    container_name: str
+    # Regex searched against each log line; the first match fires the webhook.
+    ready_pattern: str
+    # At time of writing Enshrouded, Abiotic Factor and Windrose do not support IPv6.
+    ipv6_supported: bool = True
 
-if SERVER_READY_MESSAGE is None or SERVER_READY_MESSAGE == "":
-    logger.error("SERVER_READY_MESSAGE environment variable required to function")
-    sys.exit(-1)
 
-if GAME_NAME == "valheim":
-    CONTAINER_NAME = "valheim-server"
-    REGEX_PATTERN = "Game server connected"
-elif GAME_NAME == "factorio":
-    CONTAINER_NAME = "factorio-server"
-    REGEX_PATTERN = r"changing state from\(CreatingGame\) to\(InGame\)"
-elif GAME_NAME == "enshrouded":
-    CONTAINER_NAME = "enshrouded-server"
-    REGEX_PATTERN = r"\[Session\] 'HostOnline' \(up\)!"
-elif GAME_NAME == "abiotic-factor":
-    CONTAINER_NAME = "abiotic-factor-server"
-    REGEX_PATTERN = r"Session creation completed\."
-elif GAME_NAME == "windrose":
-    CONTAINER_NAME = "windrose-server"
-    # R5LogCoopProxy ... SetIsReadyForHostOwnerConnect: fires after the save DB has
-    # loaded and the listeners are up - the true "ready for players" gate. (The port
-    # "listening" line is unreliable: it fires for the lobby before the world loads.)
-    REGEX_PATTERN = r"Host server is ready for owner to connect"
-elif GAME_NAME is None or GAME_NAME == "":
-    logger.error("GAME_NAME environment variable required to function")
-    sys.exit(-1)
-else:
-    logger.error("Unknown game {game}", game=GAME_NAME)
-    sys.exit(-1)
-
-# Compile the regex pattern for better performance
-compiled_regex = re.compile(REGEX_PATTERN)
+WATCH_CONFIGS: dict[str, WatchConfig] = {
+    "valheim": WatchConfig(
+        container_name="valheim-server",
+        ready_pattern="Game server connected",
+    ),
+    "factorio": WatchConfig(
+        container_name="factorio-server",
+        ready_pattern=r"changing state from\(CreatingGame\) to\(InGame\)",
+    ),
+    "enshrouded": WatchConfig(
+        container_name="enshrouded-server",
+        ready_pattern=r"\[Session\] 'HostOnline' \(up\)!",
+        ipv6_supported=False,
+    ),
+    "abiotic-factor": WatchConfig(
+        container_name="abiotic-factor-server",
+        ready_pattern=r"Session creation completed\.",
+        ipv6_supported=False,
+    ),
+    "windrose": WatchConfig(
+        container_name="windrose-server",
+        # R5LogCoopProxy ... SetIsReadyForHostOwnerConnect: fires after the save DB has
+        # loaded and the listeners are up - the true "ready for players" gate. (The port
+        # "listening" line is unreliable: it fires for the lobby before the world loads.)
+        ready_pattern=r"Host server is ready for owner to connect",
+        ipv6_supported=False,
+    ),
+}
 
 
 @dataclass
@@ -59,13 +64,12 @@ class ServerAddresses:
     ipv4: str
     ipv6: str | None
     domain: str | None
+    ipv6_supported: bool = True
 
     def __str__(self) -> str:
-        # At time of writing Enshrouded, Abiotic Factor and Windrose do not support IPv6
         ip_part = (
             self.ipv4
-            if self.ipv6 is None
-            or GAME_NAME in ("enshrouded", "abiotic-factor", "windrose")
+            if self.ipv6 is None or not self.ipv6_supported
             else f"{self.ipv4}, {self.ipv6}"
         )
 
@@ -85,11 +89,11 @@ def reverse_dns(ip: str) -> str | None:
 
 
 @backoff.on_exception(backoff.expo, NotFound, max_time=60)
-def get_container() -> Container:
-    return client.containers.get(CONTAINER_NAME)  # type:ignore
+def get_container(client: docker.DockerClient, container_name: str) -> Container:
+    return client.containers.get(container_name)  # type:ignore
 
 
-def get_addresses() -> ServerAddresses:
+def get_addresses(ipv6_supported: bool) -> ServerAddresses:
     r_ipv4 = requests.get("https://ipv4.icanhazip.com/")
     r_ipv6 = requests.get("https://ipv6.icanhazip.com/")
 
@@ -102,41 +106,84 @@ def get_addresses() -> ServerAddresses:
         ipv4=ipv4,
         ipv6=ipv6,
         domain=reverse_dns(ipv4),
+        ipv6_supported=ipv6_supported,
     )
 
 
-def notify_server_ready(server_addresses: ServerAddresses):
+def first_ready_line(log_lines, ready_regex: re.Pattern) -> str | None:
+    """Consume a (streaming) iterable of raw log lines; return the first line that
+    matches the readiness regex, or None if the stream ends without a match."""
+    for log_line in log_lines:
+        log_line = log_line.decode("utf-8").strip()
+
+        if ready_regex.search(log_line):
+            logger.info("Matched log line: {log_line}", log_line=log_line)
+            return log_line
+        else:
+            logger.debug("Unmatched log line: {log_line}", log_line=log_line)
+    return None
+
+
+def notify_server_ready(
+    webhook: str, ready_message: str, server_addresses: ServerAddresses
+):
     data = {
-        "content": f"{SERVER_READY_MESSAGE} [{server_addresses}]",
+        "content": f"{ready_message} [{server_addresses}]",
     }
-    result = requests.post(DISCORD_WEBHOOK, json=data)
+    result = requests.post(webhook, json=data)
     result.raise_for_status()
 
 
-# Establish a connection to the Docker server using the default socket
-client = docker.from_env()
+def main() -> None:
+    game_name = os.environ.get("GAME_NAME")
+    discord_webhook = os.environ.get("DISCORD_WEBHOOK")
+    server_ready_message = os.environ.get("SERVER_READY_MESSAGE")
 
-server_addresses = get_addresses()
+    if discord_webhook is None or discord_webhook == "":
+        logger.error("DISCORD_WEBHOOK environment variable required to function")
+        sys.exit(-1)
 
-try:
-    container = get_container()
+    if server_ready_message is None or server_ready_message == "":
+        logger.error("SERVER_READY_MESSAGE environment variable required to function")
+        sys.exit(-1)
 
-    # Stream the logs from the container, both old and new
-    for log_line in container.logs(stream=True, follow=True, tail="all"):
-        log_line = log_line.decode("utf-8").strip()
+    if game_name is None or game_name == "":
+        logger.error("GAME_NAME environment variable required to function")
+        sys.exit(-1)
 
-        if compiled_regex.search(log_line):
-            logger.info("Matched log line: {log_line}", log_line=log_line)
-            notify_server_ready(server_addresses)
-            break
-        else:
-            logger.debug("Unmatched log line: {log_line}", log_line=log_line)
+    config = WATCH_CONFIGS.get(game_name)
+    if config is None:
+        logger.error("Unknown game {game}", game=game_name)
+        sys.exit(-1)
 
-except NotFound:
-    logger.error(
-        "Container '{CONTAINER_NAME}' not found.", CONTAINER_NAME=CONTAINER_NAME
-    )
-except Exception as e:
-    logger.error("An error occurred: {e}", e=e)
-finally:
-    client.close()
+    # Compile the regex pattern for better performance
+    compiled_regex = re.compile(config.ready_pattern)
+
+    # Establish a connection to the Docker server using the default socket
+    client = docker.from_env()
+
+    server_addresses = get_addresses(config.ipv6_supported)
+
+    try:
+        container = get_container(client, config.container_name)
+
+        # Stream the logs from the container, both old and new
+        matched = first_ready_line(
+            container.logs(stream=True, follow=True, tail="all"), compiled_regex
+        )
+        if matched is not None:
+            notify_server_ready(discord_webhook, server_ready_message, server_addresses)
+
+    except NotFound:
+        logger.error(
+            "Container '{container_name}' not found.",
+            container_name=config.container_name,
+        )
+    except Exception as e:  # noqa: BLE001 — the watcher must never crash the VM boot
+        logger.error("An error occurred: {e}", e=e)
+    finally:
+        client.close()
+
+
+if __name__ == "__main__":
+    main()

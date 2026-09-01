@@ -1,4 +1,6 @@
-from . import sentry  # noqa: F401
+# Sentry must initialize before anything else is imported.
+from . import sentry  # noqa: F401  # isort: skip
+
 import os
 
 import lightbulb
@@ -287,8 +289,6 @@ async def stop_windrose(ctx: lightbulb.SlashContext) -> None:
 @lightbulb.command(f"{COMMAND_PREFIX}ping", "pong?", guilds=[GUILD_ID], auto_defer=True)
 @lightbulb.implements(lightbulb.SlashCommand)
 async def ping(ctx: lightbulb.SlashContext) -> None:
-    global TEST_MESSAGE_ID
-
     log_command(ctx)
 
     response = await ctx.respond(f"Pong! (channel_id: {ctx.channel_id})")
