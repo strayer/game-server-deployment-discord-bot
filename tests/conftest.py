@@ -4,6 +4,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import fakeredis
 import pytest
 
+# lightbulb v3 extracts the bot ID from the token's first (base64) segment at
+# client construction, so the fake token must be structurally valid.
+FAKE_BOT_TOKEN = "OTk5OTk5OTk5OTk5OTk5OTk5.fake.fake-token-for-tests"
+
 
 @pytest.fixture
 def fake_redis():
@@ -39,7 +43,7 @@ def mock_env_vars():
     env_vars = {
         "GUILD_ID": "999999999",
         "CHANNEL_IDS": "123456789,987654321",
-        "BOT_TOKEN": "fake-token",
+        "BOT_TOKEN": FAKE_BOT_TOKEN,
     }
     with patch.dict(os.environ, env_vars, clear=False):
         yield env_vars

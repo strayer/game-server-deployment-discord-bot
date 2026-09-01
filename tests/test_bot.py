@@ -2,6 +2,7 @@ import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from conftest import FAKE_BOT_TOKEN
 
 from discord_bot import games
 
@@ -12,7 +13,11 @@ class TestIsAuthorizedChannel:
     def test_returns_true_for_allowed_channel(self):
         with patch.dict(
             os.environ,
-            {"GUILD_ID": "999", "CHANNEL_IDS": "123,456,789", "BOT_TOKEN": "fake"},
+            {
+                "GUILD_ID": "999",
+                "CHANNEL_IDS": "123,456,789",
+                "BOT_TOKEN": FAKE_BOT_TOKEN,
+            },
         ):
             # Need to reimport after patching env vars
             # Reload to pick up new env vars
@@ -29,7 +34,7 @@ class TestIsAuthorizedChannel:
     def test_returns_false_for_unauthorized_channel(self):
         with patch.dict(
             os.environ,
-            {"GUILD_ID": "999", "CHANNEL_IDS": "123,456", "BOT_TOKEN": "fake"},
+            {"GUILD_ID": "999", "CHANNEL_IDS": "123,456", "BOT_TOKEN": FAKE_BOT_TOKEN},
         ):
             import importlib
 
@@ -48,17 +53,17 @@ class TestAuthorize:
     def mock_context(self):
         ctx = MagicMock()
         ctx.channel_id = 123
-        ctx.author = MagicMock()
-        ctx.author.username = "testuser"
-        ctx.command = MagicMock()
-        ctx.command.name = "test-command"
+        ctx.user = MagicMock()
+        ctx.user.username = "testuser"
+        ctx.command_data = MagicMock()
+        ctx.command_data.name = "test-command"
         ctx.respond = AsyncMock()
         return ctx
 
     async def test_authorize_rejects_unauthorized_channel(self, mock_context):
         with patch.dict(
             os.environ,
-            {"GUILD_ID": "999", "CHANNEL_IDS": "999", "BOT_TOKEN": "fake"},
+            {"GUILD_ID": "999", "CHANNEL_IDS": "999", "BOT_TOKEN": FAKE_BOT_TOKEN},
         ):
             import importlib
 
@@ -79,7 +84,7 @@ class TestAuthorize:
 
         with patch.dict(
             os.environ,
-            {"GUILD_ID": "999", "CHANNEL_IDS": "123,456", "BOT_TOKEN": "fake"},
+            {"GUILD_ID": "999", "CHANNEL_IDS": "123,456", "BOT_TOKEN": FAKE_BOT_TOKEN},
         ):
             import importlib
 
@@ -100,17 +105,17 @@ class TestCooldown:
     def mock_context(self):
         ctx = MagicMock()
         ctx.channel_id = 123
-        ctx.author = MagicMock()
-        ctx.author.username = "testuser"
-        ctx.command = MagicMock()
-        ctx.command.name = "test-command"
+        ctx.user = MagicMock()
+        ctx.user.username = "testuser"
+        ctx.command_data = MagicMock()
+        ctx.command_data.name = "test-command"
         ctx.respond = AsyncMock()
         return ctx
 
     async def test_cooldown_allows_first_request(self, mock_context, patch_db_redis):
         with patch.dict(
             os.environ,
-            {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": "fake"},
+            {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": FAKE_BOT_TOKEN},
         ):
             import importlib
 
@@ -128,7 +133,7 @@ class TestCooldown:
     ):
         with patch.dict(
             os.environ,
-            {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": "fake"},
+            {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": FAKE_BOT_TOKEN},
         ):
             import importlib
 
@@ -152,7 +157,7 @@ class TestCooldown:
     ):
         with patch.dict(
             os.environ,
-            {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": "fake"},
+            {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": FAKE_BOT_TOKEN},
         ):
             import importlib
 
@@ -173,12 +178,12 @@ class TestCooldown:
             mock_context.respond.assert_not_called()
 
 
-# (command name, bot handler attr, jobs function attr) for every slash command,
-# derived from the game registry so a new game is covered automatically.
+# (command name, jobs function attr) for every slash command, derived from the
+# game registry so a new game is covered automatically. Handlers are looked up
+# in bot.HANDLERS under the command name.
 ALL_COMMANDS = [
     (
         f"{action}-{game.game_name}",
-        f"{action}_{game.tf_var_prefix}",
         f"{action}_{game.tf_var_prefix}_server",
     )
     for game in games.ALL_GAMES.values()
@@ -194,9 +199,9 @@ class TestQueueIntegrity:
     def mock_context(self):
         ctx = MagicMock()
         ctx.channel_id = 123
-        ctx.author = MagicMock()
-        ctx.author.username = "testuser"
-        ctx.command = MagicMock()
+        ctx.user = MagicMock()
+        ctx.user.username = "testuser"
+        ctx.command_data = MagicMock()
         ctx.respond = AsyncMock()
         ctx.member = MagicMock()
         ctx.member.display_name = "Test User"
@@ -206,7 +211,7 @@ class TestQueueIntegrity:
     def bot_module(self):
         with patch.dict(
             os.environ,
-            {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": "fake"},
+            {"GUILD_ID": "999", "CHANNEL_IDS": "123", "BOT_TOKEN": FAKE_BOT_TOKEN},
         ):
             import importlib
 
@@ -215,47 +220,47 @@ class TestQueueIntegrity:
             importlib.reload(bot)
             yield bot
 
-    @pytest.mark.parametrize(("command", "handler", "job"), ALL_COMMANDS)
+    @pytest.mark.parametrize(("command", "job"), ALL_COMMANDS)
     async def test_command_enqueues_its_job(
-        self, mock_context, patch_db_redis, bot_module, command, handler, job
+        self, mock_context, patch_db_redis, bot_module, command, job
     ):
         from discord_bot import jobs
 
-        mock_context.command.name = command
+        mock_context.command_data.name = command
 
         mock_queue = MagicMock()
         with patch.object(jobs, "get_queue", return_value=mock_queue):
-            await getattr(bot_module, handler)(mock_context)
+            await bot_module.HANDLERS[command](mock_context)
 
         mock_queue.enqueue.assert_called_once_with(getattr(jobs, job))
 
-    @pytest.mark.parametrize(("command", "handler", "job"), ALL_COMMANDS)
+    @pytest.mark.parametrize(("command", "job"), ALL_COMMANDS)
     async def test_unauthorized_channel_enqueues_nothing(
-        self, mock_context, patch_db_redis, bot_module, command, handler, job
+        self, mock_context, patch_db_redis, bot_module, command, job
     ):
         from discord_bot import jobs
 
-        mock_context.command.name = command
+        mock_context.command_data.name = command
         mock_context.channel_id = 666  # not in CHANNEL_IDS
 
         mock_queue = MagicMock()
         with patch.object(jobs, "get_queue", return_value=mock_queue):
-            await getattr(bot_module, handler)(mock_context)
+            await bot_module.HANDLERS[command](mock_context)
 
         mock_queue.enqueue.assert_not_called()
         mock_context.respond.assert_called_once()
 
-    @pytest.mark.parametrize(("command", "handler", "job"), ALL_COMMANDS)
+    @pytest.mark.parametrize(("command", "job"), ALL_COMMANDS)
     async def test_command_on_cooldown_enqueues_nothing(
-        self, mock_context, patch_db_redis, bot_module, command, handler, job
+        self, mock_context, patch_db_redis, bot_module, command, job
     ):
         from discord_bot import jobs
 
-        mock_context.command.name = command
+        mock_context.command_data.name = command
         patch_db_redis.set(f"cooldown_{command}", 1, ex=60)
 
         mock_queue = MagicMock()
         with patch.object(jobs, "get_queue", return_value=mock_queue):
-            await getattr(bot_module, handler)(mock_context)
+            await bot_module.HANDLERS[command](mock_context)
 
         mock_queue.enqueue.assert_not_called()
