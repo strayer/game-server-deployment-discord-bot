@@ -23,49 +23,34 @@ Create the zone (e.g. `games.example.tld`) in deSEC, then delegate it from the p
 | 2. Zone-wide | API only (the web UI cannot set policies): default deny + one write policy for the zone | Anything in that zone, nothing else in the account. **Current choice.** |
 | 3. Per-record | API only: default deny + one write policy per game for A and AAAA | Those ten records only. |
 
-Option 2, step by step. Create a temporary admin token in the web UI (https://desec.io/tokens, enable **manage tokens**), then run this from any shell with `curl` and `jq`:
+Option 2, step by step. Create a temporary admin token in the web UI (https://desec.io/tokens, enable **manage tokens**). Replace `ADMIN_TOKEN`, `ZONE` and `TOKEN_ID` by hand; the commands work in any shell.
 
-```sh
-ADMIN=<admin token>          # temporary, delete it in the UI afterwards
-ZONE=games.example.tld
-api() { curl -sS -H "Authorization: Token $ADMIN" -H "Content-Type: application/json" "$@"; }
+```
+# 1. Create the job-runner token. Note "id" and "token" from the output (token is shown only once).
+curl -sS -X POST https://desec.io/api/v1/auth/tokens/ -H 'Authorization: Token ADMIN_TOKEN' -H 'Content-Type: application/json' -d '{"name":"game-server-job-runner","perm_create_domain":false,"perm_delete_domain":false,"perm_manage_tokens":false}'
 
-# 1. Create the job-runner token (no domain create/delete, no token management).
-RESP=$(api -X POST https://desec.io/api/v1/auth/tokens/ \
-  -d '{"name":"game-server-job-runner","perm_create_domain":false,"perm_delete_domain":false,"perm_manage_tokens":false}')
-ID=$(echo "$RESP" | jq -r .id)
-TOKEN=$(echo "$RESP" | jq -r .token)   # shown only once -> DESEC_TOKEN in job-runner.env
+# 2. Default policy first (required): deny writes everywhere.
+curl -sS -X POST https://desec.io/api/v1/auth/tokens/TOKEN_ID/policies/rrsets/ -H 'Authorization: Token ADMIN_TOKEN' -H 'Content-Type: application/json' -d '{"domain":null,"subname":null,"type":null,"perm_write":false}'
 
-# 2. Default policy first (required): deny writes everywhere ...
-P=https://desec.io/api/v1/auth/tokens/$ID/policies/rrsets/
-api -X POST "$P" -d '{"domain":null,"subname":null,"type":null,"perm_write":false}'
-sleep 1
-# 3. ... then allow writes in the game zone only.
-api -X POST "$P" -d "{\"domain\":\"$ZONE\",\"subname\":null,\"type\":null,\"perm_write\":true}"
+# 3. Allow writes in the game zone only.
+curl -sS -X POST https://desec.io/api/v1/auth/tokens/TOKEN_ID/policies/rrsets/ -H 'Authorization: Token ADMIN_TOKEN' -H 'Content-Type: application/json' -d '{"domain":"ZONE","subname":null,"type":null,"perm_write":true}'
 
-# 4. Check: the new token can read the zone (200), cannot manage tokens (403).
-curl -s -o /dev/null -w 'zone read: %{http_code}\n'   -H "Authorization: Token $TOKEN" https://desec.io/api/v1/domains/$ZONE/
-curl -s -o /dev/null -w 'token list: %{http_code}\n'  -H "Authorization: Token $TOKEN" https://desec.io/api/v1/auth/tokens/
-echo "DESEC_TOKEN=$TOKEN"
+# 4. Check with the NEW token: zone read must be 200, token listing must be 403.
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Authorization: Token NEW_TOKEN' https://desec.io/api/v1/domains/ZONE/
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Authorization: Token NEW_TOKEN' https://desec.io/api/v1/auth/tokens/
 ```
 
-Put the printed `DESEC_TOKEN` into `job-runner.env`, then delete the admin token in the web UI (or `api -X DELETE https://desec.io/api/v1/auth/tokens/<admin id>/`).
+Put the new token into `job-runner.env` as `DESEC_TOKEN`, then delete the admin token in the web UI.
 
-Option 3 (per-record) is the same sequence with step 3 replaced by one policy per game record:
+Option 3 (per-record): same steps, but instead of step 3 run this once per game (`valheim`, `factorio`, `enshrouded`, `abiotic-factor`, `windrose`) and per type (`A`, `AAAA`), pausing a second between calls (deSEC throttles writes):
 
-```sh
-for g in valheim factorio enshrouded abiotic-factor windrose; do
-  for t in A AAAA; do
-    api -X POST "$P" -d "{\"domain\":\"$ZONE\",\"subname\":\"$g\",\"type\":\"$t\",\"perm_write\":true}"
-    sleep 1  # deSEC throttles writes
-  done
-done
+```
+curl -sS -X POST https://desec.io/api/v1/auth/tokens/TOKEN_ID/policies/rrsets/ -H 'Authorization: Token ADMIN_TOKEN' -H 'Content-Type: application/json' -d '{"domain":"ZONE","subname":"GAME","type":"TYPE","perm_write":true}'
 ```
 
 Notes:
 
 - Reads are allowed for every token regardless of policy; policies only restrict writes.
-- deSEC throttles writes (~2/s per zone); the `sleep 1` lines avoid 429.
 - A new game under option 3 needs its own A/AAAA policies.
 
 ### Verify
