@@ -19,8 +19,8 @@ Create the zone (e.g. `games.example.tld`) in deSEC, then delegate it from the p
 
 | Option | How | If the token leaks |
 |---|---|---|
-| 1. Unrestricted | Web UI, https://desec.io/tokens | Every domain in the deSEC account. Fine while the account holds only the game zone (current choice). |
-| 2. Zone-wide | API only (the web UI cannot set policies): default deny + one write policy for the zone | Anything in that zone, nothing else in the account. |
+| 1. Unrestricted | Web UI, https://desec.io/tokens | Every domain in the deSEC account. Only acceptable while the account holds nothing but the game zone. |
+| 2. Zone-wide | API only (the web UI cannot set policies): default deny + one write policy for the zone | Anything in that zone, nothing else in the account. **Current choice.** |
 | 3. Per-record | API only: default deny + one write policy per game for A and AAAA | Those ten records only. |
 
 For options 2 and 3, create an admin token with `perm_manage_tokens` in the web UI, then:
