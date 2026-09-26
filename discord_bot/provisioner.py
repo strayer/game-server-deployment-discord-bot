@@ -9,6 +9,7 @@ SSH key, and never deletes ``<game>-install`` volumes (adopt/attach/detach only)
 from __future__ import annotations
 
 import dataclasses
+import ipaddress
 import os
 import subprocess
 import time
@@ -79,6 +80,7 @@ class AlreadyDeployedError(ProvisionError):
 class DeployResult:
     server_name: str
     ipv4: str
+    ipv6: str | None = None
 
 
 class Provisioner:
@@ -357,8 +359,13 @@ class Provisioner:
 
             created_server.reload()
             ipv4 = created_server.public_net.ipv4.ip
+            ipv6 = None
+            v6_net = created_server.public_net.ipv6
+            if game.spec.ipv6_supported and v6_net is not None:
+                # Hetzner reports the /64; the VM uses its ::1 host address.
+                ipv6 = str(ipaddress.IPv6Network(v6_net.ip)[1])
             logger.info("Server {name} created @ {ip}", name=game.server_name, ip=ipv4)
-            return DeployResult(server_name=game.server_name, ipv4=ipv4)
+            return DeployResult(server_name=game.server_name, ipv4=ipv4, ipv6=ipv6)
 
         except ProvisionError:
             self._rollback(game, created_server, created_firewall)

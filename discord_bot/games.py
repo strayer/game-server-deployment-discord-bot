@@ -42,6 +42,8 @@ class ServerSpec:
     #   "stop-timeout" -> docker stop -t <stop_timeout> <container>   (graceful flush)
     stop_strategy: str = "stop"
     stop_timeout: int = 90
+    # IPv4-only games get no AAAA record and no IPv6 in the ready message.
+    ipv6_supported: bool = True
 
     @property
     def has_volume(self) -> bool:
@@ -88,6 +90,12 @@ class Game:
         return self.game_name.replace("-", "_")
 
     @property
+    def hostname(self) -> str:
+        return (
+            f"{self.game_name}.{os.environ['DESEC_ZONE'].strip().rstrip('.').lower()}"
+        )
+
+    @property
     def discord_channel_webhook(self) -> str | None:
         """The game's Discord channel webhook (for error/teardown notifications)."""
         return os.environ.get(f"TF_VAR_{self.tf_var_prefix}_discord_channel_webhook")
@@ -131,6 +139,7 @@ ENSHROUDED = Game(
     spec=ServerSpec(
         location="nbg1",
         firewall_ports=(("udp", "15636-15637"), ("tcp", "15636-15637")),
+        ipv6_supported=False,
     ),
 )
 
@@ -144,6 +153,7 @@ ABIOTIC_FACTOR = Game(
     spec=ServerSpec(
         location="nbg1",
         firewall_ports=(("udp", "7777"), ("udp", "27015")),
+        ipv6_supported=False,
         volume_size_gb=10,
         volume_format="ext4",
         # max players is not in the environment; it was a Terraform default (6).
@@ -161,6 +171,7 @@ WINDROSE = Game(
     spec=ServerSpec(
         location="nbg1",
         firewall_ports=(("tcp", "7777"), ("udp", "7777")),
+        ipv6_supported=False,
         volume_size_gb=10,
         volume_format="ext4",
         # Longer stop timeout so the wineserver -k graceful shutdown can flush the

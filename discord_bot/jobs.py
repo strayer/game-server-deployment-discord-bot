@@ -8,7 +8,7 @@ import sentry_sdk
 from loguru import logger
 from rq import Queue
 
-from discord_bot import db, games, provisioner
+from discord_bot import db, dns, games, provisioner
 from discord_bot.provisioner import AlreadyDeployedError, ProvisionError
 
 _QUEUE = None
@@ -49,11 +49,29 @@ def _notify(game: games.Game, content: str) -> None:
         sentry_sdk.capture_exception(exc)
 
 
+def _dns_warning(game: games.Game, message: str, exc: dns.DnsError) -> None:
+    logger.error("{m}", m=message)
+    sentry_sdk.capture_exception(exc)
+    _notify(game, f"⚠️ {message}")
+
+
 def start_server(game: games.Game) -> None:
     lock_name = f"{game.game_name}_server"
 
     with db.get_redis().lock(lock_name):
         logger.info("Starting {g} server", g=game.game_display_name)
+        try:
+            client = dns.client_from_env()
+            client.check()
+        except dns.DnsError as exc:
+            logger.error("DNS configuration invalid: {e}", e=exc)
+            sentry_sdk.capture_exception(exc)
+            _notify(
+                game,
+                f"❌ DNS configuration invalid — refusing to start "
+                f"{game.game_display_name}: {exc}",
+            )
+            return
         prov = get_provisioner()
         try:
             result = prov.deploy(game)
@@ -90,6 +108,16 @@ def start_server(game: games.Game) -> None:
             g=game.game_display_name,
             ip=result.ipv4,
         )
+        try:
+            client.publish(game.game_name, result.ipv4, result.ipv6)
+        except dns.DnsError as exc:
+            ips = ", ".join(ip for ip in (result.ipv4, result.ipv6) if ip)
+            _dns_warning(
+                game,
+                f"DNS update for {client.hostname(game.game_name)} failed — "
+                f"only the IP works this time: {ips}. {exc}",
+                exc,
+            )
 
 
 def stop_server(game: games.Game) -> None:
@@ -98,6 +126,11 @@ def stop_server(game: games.Game) -> None:
     with db.get_redis().lock(lock_name):
         logger.info("Stopping {g} server", g=game.game_display_name)
         _notify(game, game.bot_message_started)
+        client = None
+        try:
+            client = dns.client_from_env()
+        except dns.DnsError as exc:
+            _dns_warning(game, f"DNS records cannot be cleared: {exc}", exc)
         prov = get_provisioner()
         try:
             prov.destroy(game)
@@ -119,6 +152,15 @@ def stop_server(game: games.Game) -> None:
             )
             return
 
+        if client is not None:
+            try:
+                client.clear(game.game_name)
+            except dns.DnsError as exc:
+                _dns_warning(
+                    game,
+                    f"clearing {client.hostname(game.game_name)} failed: {exc}",
+                    exc,
+                )
         _notify(game, game.bot_message_finished)
         logger.info("Finished stopping {g} server", g=game.game_display_name)
 

@@ -1,5 +1,7 @@
 """Tests for per-game configuration (discord_bot.games)."""
 
+import pytest
+
 from discord_bot import games
 
 
@@ -88,3 +90,20 @@ class TestServerSpec:
         for game in (games.ABIOTIC_FACTOR, games.WINDROSE):
             assert game.spec.volume_size_gb is not None
             assert game.spec.volume_format == "ext4"
+
+
+@pytest.mark.parametrize(
+    ("game", "ipv6", "hostname"),
+    [
+        (games.VALHEIM, True, "valheim.games.example.tld"),
+        (games.FACTORIO, True, "factorio.games.example.tld"),
+        (games.ENSHROUDED, False, "enshrouded.games.example.tld"),
+        (games.ABIOTIC_FACTOR, False, "abiotic-factor.games.example.tld"),
+        (games.WINDROSE, False, "windrose.games.example.tld"),
+    ],
+    ids=["valheim", "factorio", "enshrouded", "abiotic-factor", "windrose"],
+)
+def test_ipv6_support_and_hostname(game, ipv6, hostname, monkeypatch):
+    monkeypatch.setenv("DESEC_ZONE", " Games.Example.TLD. ")
+    assert game.spec.ipv6_supported is ipv6
+    assert game.hostname == hostname

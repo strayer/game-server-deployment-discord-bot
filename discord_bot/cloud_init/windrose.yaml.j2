@@ -155,6 +155,7 @@ runcmd:
       docker run -d --read-only --network=host \
         -v /var/run/docker.sock:/var/run/docker.sock:ro \
         -e GAME_NAME=windrose \
+        -e SERVER_HOSTNAME="{{ server_hostname }}" \
         -e DISCORD_WEBHOOK={{ windrose_discord_channel_webhook }} \
         -e SERVER_READY_MESSAGE="{{ bot_server_ready_message }}" \
         --name server-launch-watcher \
