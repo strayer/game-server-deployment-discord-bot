@@ -7,7 +7,6 @@ module is side-effect free so the per-game config and matching logic are testabl
 
 import os
 import re
-import socket
 import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -18,6 +17,7 @@ from docker.errors import NotFound
 from loguru import logger
 
 import docker
+from discord_bot import games
 
 if TYPE_CHECKING:
     from docker.models.containers import Container
@@ -28,8 +28,6 @@ class WatchConfig:
     container_name: str
     # Regex searched against each log line; the first match fires the webhook.
     ready_pattern: str
-    # At time of writing Enshrouded, Abiotic Factor and Windrose do not support IPv6.
-    ipv6_supported: bool = True
 
 
 WATCH_CONFIGS: dict[str, WatchConfig] = {
@@ -44,12 +42,10 @@ WATCH_CONFIGS: dict[str, WatchConfig] = {
     "enshrouded": WatchConfig(
         container_name="enshrouded-server",
         ready_pattern=r"\[Session\] 'HostOnline' \(up\)!",
-        ipv6_supported=False,
     ),
     "abiotic-factor": WatchConfig(
         container_name="abiotic-factor-server",
         ready_pattern=r"Session creation completed\.",
-        ipv6_supported=False,
     ),
     "windrose": WatchConfig(
         container_name="windrose-server",
@@ -57,7 +53,6 @@ WATCH_CONFIGS: dict[str, WatchConfig] = {
         # loaded and the listeners are up - the true "ready for players" gate. (The port
         # "listening" line is unreliable: it fires for the lobby before the world loads.)
         ready_pattern=r"Host server is ready for owner to connect",
-        ipv6_supported=False,
     ),
 }
 
@@ -66,29 +61,11 @@ WATCH_CONFIGS: dict[str, WatchConfig] = {
 class ServerAddresses:
     ipv4: str
     ipv6: str | None
-    domain: str | None
-    ipv6_supported: bool = True
+    domain: str
 
     def __str__(self) -> str:
-        ip_part = (
-            self.ipv4
-            if self.ipv6 is None or not self.ipv6_supported
-            else f"{self.ipv4}, {self.ipv6}"
-        )
-
-        if self.domain is None:
-            return ip_part
-        else:
-            return f"{self.domain} ({ip_part})"
-
-
-def reverse_dns(ip: str) -> str | None:
-    try:
-        resolved_hostname, _, _ = socket.gethostbyaddr(ip)
-        return resolved_hostname
-    except socket.herror:
-        # Handle exception which may be thrown if the IP does not have a reverse DNS record
-        return None
+        ip_part = self.ipv4 if self.ipv6 is None else f"{self.ipv4}, {self.ipv6}"
+        return f"{self.domain} ({ip_part})"
 
 
 @tenacity.retry(
@@ -101,21 +78,16 @@ def get_container(client: docker.DockerClient, container_name: str) -> Container
     return client.containers.get(container_name)  # type:ignore
 
 
-def get_addresses(ipv6_supported: bool) -> ServerAddresses:
+def get_addresses(ipv6_supported: bool, hostname: str) -> ServerAddresses:
     r_ipv4 = requests.get("https://ipv4.icanhazip.com/")
     r_ipv6 = requests.get("https://ipv6.icanhazip.com/")
 
     r_ipv4.raise_for_status()
 
     ipv4 = r_ipv4.text.strip()
-    ipv6 = r_ipv6.text.strip() if r_ipv6.ok else None
+    ipv6 = r_ipv6.text.strip() if r_ipv6.ok and ipv6_supported else None
 
-    return ServerAddresses(
-        ipv4=ipv4,
-        ipv6=ipv6,
-        domain=reverse_dns(ipv4),
-        ipv6_supported=ipv6_supported,
-    )
+    return ServerAddresses(ipv4=ipv4, ipv6=ipv6, domain=hostname)
 
 
 def first_ready_line(log_lines, ready_regex: re.Pattern) -> str | None:
@@ -146,6 +118,7 @@ def main() -> None:
     game_name = os.environ.get("GAME_NAME")
     discord_webhook = os.environ.get("DISCORD_WEBHOOK")
     server_ready_message = os.environ.get("SERVER_READY_MESSAGE")
+    server_hostname = os.environ.get("SERVER_HOSTNAME")
 
     if discord_webhook is None or discord_webhook == "":
         logger.error("DISCORD_WEBHOOK environment variable required to function")
@@ -159,6 +132,10 @@ def main() -> None:
         logger.error("GAME_NAME environment variable required to function")
         sys.exit(-1)
 
+    if not server_hostname:
+        logger.error("SERVER_HOSTNAME environment variable required to function")
+        sys.exit(-1)
+
     config = WATCH_CONFIGS.get(game_name)
     if config is None:
         logger.error("Unknown game {game}", game=game_name)
@@ -170,7 +147,9 @@ def main() -> None:
     # Establish a connection to the Docker server using the default socket
     client = docker.from_env()
 
-    server_addresses = get_addresses(config.ipv6_supported)
+    server_addresses = get_addresses(
+        games.ALL_GAMES[game_name].spec.ipv6_supported, server_hostname
+    )
 
     try:
         container = get_container(client, config.container_name)

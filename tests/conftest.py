@@ -9,6 +9,18 @@ import pytest
 FAKE_BOT_TOKEN = "OTk5OTk5OTk5OTk5OTk5OTk5.fake.fake-token-for-tests"
 
 
+@pytest.fixture(autouse=True)
+def _test_desec_config(monkeypatch):
+    """Pin DESEC_* to harmless test values for every test.
+
+    DNS configuration is mandatory, so this both makes a valid config available
+    and isolates the suite from any real DESEC_* exported in the developer's
+    shell. Tests for missing/invalid config ``delenv``/``setenv`` explicitly.
+    """
+    monkeypatch.setenv("DESEC_TOKEN", "test-token")
+    monkeypatch.setenv("DESEC_ZONE", "games.example.tld")
+
+
 @pytest.fixture
 def fake_redis():
     """Create a fresh FakeRedis instance for each test."""

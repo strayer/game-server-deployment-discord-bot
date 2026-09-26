@@ -71,6 +71,7 @@ def build_context(
 
     Resolution order per variable:
       * ``bot_server_*_message`` -> the Game's bot message fields,
+      * ``server_hostname``      -> ``game.hostname``,
       * ``*_volume_id``          -> the resolved/created volume id,
       * ``TF_VAR_<name>`` env    -> the environment (secrets, server config),
       * ``spec.cloud_init_defaults[<name>]`` -> non-secret defaults.
@@ -86,6 +87,8 @@ def build_context(
             context[name] = game.bot_message_server_started
         elif name == _BOT_READY_KEY:
             context[name] = game.bot_message_server_ready
+        elif name == "server_hostname":
+            context[name] = game.hostname
         elif name.endswith(_VOLUME_ID_SUFFIX):
             if volume_id is None:
                 missing.append(f"{name} (no volume id supplied)")

@@ -21,6 +21,7 @@ from discord_bot import cloud_init, games
 ALL_GAMES = list(games.ALL_GAMES.values())
 _FIXED_VOLUME_ID = 98765
 _SNAPSHOT_DIR = Path(__file__).parent / "snapshots"
+_DESEC_ENV = {"DESEC_ZONE": "games.example.tld"}  # renders SERVER_HOSTNAME
 
 
 def _fake_value(name: str) -> str:
@@ -46,9 +47,11 @@ def _env_for(game: games.Game) -> dict[str, str]:
     """
     env_obj = cloud_init._environment()
     text = cloud_init._read_template(game.game_name)
-    env: dict[str, str] = {}
+    env: dict[str, str] = dict(_DESEC_ENV)
     for name in cloud_init.referenced_variables(env_obj, text):
         if name in (cloud_init._BOT_STARTED_KEY, cloud_init._BOT_READY_KEY):
+            continue
+        if name == "server_hostname":
             continue
         if name.endswith(cloud_init._VOLUME_ID_SUFFIX):
             continue
@@ -70,7 +73,7 @@ def test_render_matches_snapshot(game, snapshot):
 def test_missing_env_var_raises_clear_error():
     """A placeholder with no TF_VAR_ value fails, naming the missing var."""
     with (
-        patch.dict(os.environ, {}, clear=True),
+        patch.dict(os.environ, _DESEC_ENV, clear=True),
         pytest.raises(cloud_init.CloudInitError) as exc,
     ):
         cloud_init.render(games.FACTORIO)

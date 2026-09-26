@@ -16,7 +16,14 @@ import pytest
 from hcloud import APIException
 
 from discord_bot import provisioner as prov
-from discord_bot.games import ABIOTIC_FACTOR, ALL_GAMES, FACTORIO, WINDROSE
+from discord_bot.games import (
+    ABIOTIC_FACTOR,
+    ALL_GAMES,
+    ENSHROUDED,
+    FACTORIO,
+    VALHEIM,
+    WINDROSE,
+)
 from discord_bot.provisioner import (
     AlreadyDeployedError,
     DeployResult,
@@ -38,6 +45,7 @@ def _action() -> MagicMock:
 def _make_server(status: str = "running") -> MagicMock:
     server = MagicMock(name="server")
     server.public_net.ipv4.ip = SERVER_IP
+    server.public_net.ipv6.ip = "2a01:4f8:1c1c:1234::/64"
     server.status = status
     server.reload.return_value = None
     server.delete.return_value = _action()
@@ -139,6 +147,22 @@ class TestDeploy:
         assert kwargs["firewalls"] == [created_firewall]
         # ssh_keys must be the full get_all() list.
         assert kwargs["ssh_keys"] == client.ssh_keys.get_all.return_value
+
+    @pytest.mark.parametrize(
+        ("game", "has_ipv6", "expected"),
+        [
+            (VALHEIM, True, "2a01:4f8:1c1c:1234::1"),
+            (ENSHROUDED, True, None),
+            (VALHEIM, False, None),
+        ],
+        ids=["v6-game-gets-host-1", "v4-only-game", "no-ipv6-reported"],
+    )
+    def test_ipv6_host_address(self, wired, game, has_ipv6, expected):
+        provisioner, client = wired
+        if not has_ipv6:
+            client.servers.create.return_value.server.public_net.ipv6 = None
+
+        assert provisioner.deploy(game).ipv6 == expected
 
     def test_start_guard_refuses_when_server_exists(self, wired):
         provisioner, client = wired

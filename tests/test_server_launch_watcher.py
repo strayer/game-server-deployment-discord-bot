@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 import typing
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -94,44 +94,51 @@ class TestFirstReadyLine:
         assert watcher.first_ready_line(iter([b"a", b"b"]), pattern) is None
 
 
-class TestServerAddresses:
-    def test_ipv4_only(self):
-        addresses = watcher.ServerAddresses(ipv4="1.2.3.4", ipv6=None, domain=None)
-        assert str(addresses) == "1.2.3.4"
-
-    def test_ipv4_and_ipv6_when_supported(self):
-        addresses = watcher.ServerAddresses(
-            ipv4="1.2.3.4", ipv6="2001:db8::1", domain=None, ipv6_supported=True
-        )
-        assert str(addresses) == "1.2.3.4, 2001:db8::1"
-
-    def test_ipv6_hidden_when_game_does_not_support_it(self):
-        addresses = watcher.ServerAddresses(
-            ipv4="1.2.3.4", ipv6="2001:db8::1", domain=None, ipv6_supported=False
-        )
-        assert str(addresses) == "1.2.3.4"
-
-    def test_domain_wraps_the_ip_part(self):
-        addresses = watcher.ServerAddresses(
-            ipv4="1.2.3.4", ipv6=None, domain="static.1.2.3.4.example.net"
-        )
-        assert str(addresses) == "static.1.2.3.4.example.net (1.2.3.4)"
+@pytest.mark.parametrize(
+    ("ipv6", "expected"),
+    [
+        (None, "host.example (1.2.3.4)"),
+        ("2001:db8::1", "host.example (1.2.3.4, 2001:db8::1)"),
+    ],
+    ids=["ipv4-only", "dual-stack"],
+)
+def test_server_addresses_str(ipv6, expected):
+    addresses = watcher.ServerAddresses(
+        ipv4="1.2.3.4", ipv6=ipv6, domain="host.example"
+    )
+    assert str(addresses) == expected
 
 
-class TestReverseDns:
-    def test_resolves(self):
-        with patch.object(
-            watcher.socket, "gethostbyaddr", return_value=("host.example", [], [])
-        ):
-            assert watcher.reverse_dns("1.2.3.4") == "host.example"
+def _fake_get(url, *args, **kwargs):
+    response = MagicMock(ok=True)
+    response.text = "2001:db8::1\n" if "ipv6" in url else "1.2.3.4\n"
+    return response
 
-    def test_missing_ptr_record_returns_none(self):
-        with patch.object(
-            watcher.socket,
-            "gethostbyaddr",
-            side_effect=watcher.socket.herror("no PTR"),
-        ):
-            assert watcher.reverse_dns("1.2.3.4") is None
+
+@pytest.mark.parametrize(
+    ("game_name", "expected_ips"),
+    [("valheim", "1.2.3.4, 2001:db8::1"), ("enshrouded", "1.2.3.4")],
+    ids=["ipv6-game", "ipv4-only-game"],
+)
+def test_main_posts_hostname_and_addresses(monkeypatch, game_name, expected_ips):
+    hostname = f"{game_name}.games.example.tld"
+    monkeypatch.setenv("GAME_NAME", game_name)
+    monkeypatch.setenv("DISCORD_WEBHOOK", "https://hook.test")
+    monkeypatch.setenv("SERVER_READY_MESSAGE", "Ready!")
+    monkeypatch.setenv("SERVER_HOSTNAME", hostname)
+    container = MagicMock()
+    container.logs.return_value = iter([READY_LOG_LINES[game_name]])
+
+    with (
+        patch.object(watcher.docker, "from_env"),
+        patch.object(watcher, "get_container", return_value=container),
+        patch.object(watcher.requests, "get", side_effect=_fake_get),
+        patch.object(watcher.requests, "post") as post,
+    ):
+        watcher.main()
+
+    content = post.call_args.kwargs["json"]["content"]
+    assert content == f"Ready! [{hostname} ({expected_ips})]"
 
 
 class TestMainStartupValidation:
@@ -142,10 +149,12 @@ class TestMainStartupValidation:
         "GAME_NAME": "valheim",
         "DISCORD_WEBHOOK": "https://hook.test",
         "SERVER_READY_MESSAGE": "Ready!",
+        "SERVER_HOSTNAME": "valheim.games.example.tld",
     }
 
     @pytest.mark.parametrize(
-        "missing", ["GAME_NAME", "DISCORD_WEBHOOK", "SERVER_READY_MESSAGE"]
+        "missing",
+        ["GAME_NAME", "DISCORD_WEBHOOK", "SERVER_READY_MESSAGE", "SERVER_HOSTNAME"],
     )
     def test_missing_env_var_exits(self, monkeypatch, missing):
         for key, value in self.ENV_OK.items():

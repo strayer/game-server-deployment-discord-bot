@@ -4,7 +4,8 @@ These pin the worker-side contract that the refactorings must preserve:
   * a raced/repeated start is a safe no-op that warns on Discord,
   * provisioning failures are reported to Discord + Sentry and never crash the job,
   * a failed Discord notification never crashes the job either,
-  * stop posts the "shutting down" / "destroyed" messages around the teardown.
+  * stop posts the "shutting down" / "destroyed" messages around the teardown,
+  * DNS: a failed deSEC check refuses the start; publish/clear failures only warn.
 
 The provisioner and requests are mocked; Redis (locks) is fakeredis via conftest.
 """
@@ -17,10 +18,20 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from discord_bot import games, jobs
+from discord_bot.dns import DesecClient, DnsError
 from discord_bot.provisioner import AlreadyDeployedError, DeployResult, ProvisionError
 
 GAME = games.VALHEIM
 WEBHOOK_ENV = {"TF_VAR_valheim_discord_channel_webhook": "https://discord.test/hook"}
+
+
+@pytest.fixture(autouse=True)
+def dns_client():
+    """No job test may reach deSEC: every job gets this mock client."""
+    client = MagicMock(spec=DesecClient)
+    client.hostname.side_effect = lambda sub: f"{sub}.games.example.tld"
+    with patch.object(jobs.dns, "client_from_env", return_value=client):
+        yield client
 
 
 @pytest.fixture
@@ -28,7 +39,7 @@ def prov():
     """A mocked provisioner with a success-path deploy/destroy."""
     prov = MagicMock(name="provisioner")
     prov.deploy.return_value = DeployResult(
-        server_name=GAME.server_name, ipv4="203.0.113.10"
+        server_name=GAME.server_name, ipv4="203.0.113.10", ipv6="2001:db8::1"
     )
     prov.destroy.return_value = None
     return prov
@@ -207,3 +218,79 @@ class TestJobWiring:
         with patch.object(jobs, "stop_server") as stop_server:
             getattr(jobs, f"stop_{game.tf_var_prefix}_server")()
         stop_server.assert_called_once_with(game=game)
+
+
+class TestDns:
+    def test_failed_check_refuses_start(self, wired, dns_client):
+        prov, post = wired
+        dns_client.check.side_effect = DnsError("deSEC GET /domains/x/: HTTP 401")
+
+        jobs.start_server(GAME)
+
+        prov.deploy.assert_not_called()
+        [content] = _posted_contents(post)
+        assert content.startswith("❌ DNS configuration invalid")
+        assert "HTTP 401" in content
+
+    def test_publishes_deploy_addresses(self, wired, dns_client):
+        jobs.start_server(GAME)
+
+        dns_client.publish.assert_called_once_with(
+            "valheim", "203.0.113.10", "2001:db8::1"
+        )
+
+    def test_publish_failure_warns_and_keeps_server(self, wired, dns_client):
+        prov, post = wired
+        dns_client.publish.side_effect = DnsError("HTTP 403")
+
+        with patch.object(jobs.sentry_sdk, "capture_exception") as capture:
+            jobs.start_server(GAME)
+
+        prov.destroy.assert_not_called()
+        capture.assert_called_once()
+        [content] = _posted_contents(post)
+        assert content.startswith("⚠️ DNS update for valheim.games.example.tld")
+        assert "203.0.113.10, 2001:db8::1" in content
+
+    @pytest.mark.parametrize(
+        "error",
+        [AlreadyDeployedError(GAME), ProvisionError("server", "boom")],
+        ids=["already-deployed", "provision-error"],
+    )
+    def test_no_publish_when_deploy_fails(self, wired, dns_client, error):
+        wired[0].deploy.side_effect = error
+
+        jobs.start_server(GAME)
+
+        dns_client.publish.assert_not_called()
+
+    def test_stop_clears_after_destroy(self, wired, dns_client):
+        prov, post = wired
+        calls = []
+        prov.destroy.side_effect = lambda game: calls.append("destroy")
+        dns_client.clear.side_effect = lambda sub: calls.append(f"clear {sub}")
+
+        jobs.stop_server(GAME)
+
+        assert calls == ["destroy", "clear valheim"]
+        assert _posted_contents(post)[-1] == GAME.bot_message_finished
+
+    def test_failed_destroy_keeps_records(self, wired, dns_client):
+        wired[0].destroy.side_effect = ProvisionError("backup", "restic failed")
+
+        jobs.stop_server(GAME)
+
+        dns_client.clear.assert_not_called()
+
+    def test_config_error_on_stop_warns_and_tears_down(self, wired):
+        prov, post = wired
+
+        with patch.object(
+            jobs.dns, "client_from_env", side_effect=DnsError("DESEC_TOKEN is missing")
+        ):
+            jobs.stop_server(GAME)
+
+        prov.destroy.assert_called_once_with(GAME)
+        contents = _posted_contents(post)
+        assert contents[1] == "⚠️ DNS records cannot be cleared: DESEC_TOKEN is missing"
+        assert contents[-1] == GAME.bot_message_finished
