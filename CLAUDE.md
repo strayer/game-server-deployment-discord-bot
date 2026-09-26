@@ -23,6 +23,7 @@ The core components are:
 > `valheim.games.example.tld`) that the job-runner publishes to deSEC.io. The
 > config is **mandatory**: `DESEC_TOKEN`/`DESEC_ZONE` are verified with one
 > authenticated API call before a server is created. No reverse DNS is set.
+> Operator setup (zone delegation, token scoping options) is in `README.md` → DNS.
 
 ## Project Structure
 
