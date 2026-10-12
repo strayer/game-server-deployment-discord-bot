@@ -113,6 +113,8 @@ VALHEIM = Game(
         firewall_ports=(("udp", "2456-2457"),),
         # Valheim needs SIGINT + `docker wait` to flush its world save cleanly.
         stop_strategy="sigint-wait",
+        # Optional BepInEx modpack zip (docker/valheim/start.sh); empty = vanilla.
+        cloud_init_defaults={"valheim_modpack_url": ""},
     ),
 )
 

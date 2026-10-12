@@ -64,3 +64,27 @@ Notes:
 
 `dig @ns1.desec.io valheim.games.example.tld A` returns the server IP after `/start`,
 and an empty answer after `/stop`.
+
+## Modded Valheim (BepInEx)
+
+The Valheim server runs vanilla by default. To run it with BepInEx mods, set
+`TF_VAR_valheim_modpack_url` in `job-runner.env` to the URL of a zip that is rooted at the
+Valheim server folder:
+
+```
+BepInEx/core/...            (BepInEx itself, required)
+BepInEx/plugins/...         (server-side mods)
+BepInEx/config/...          (optional mod configs)
+doorstop_libs/libdoorstop_x64.so   (required)
+```
+
+On every start, after the Steam update, the container deletes any previous `BepInEx/`,
+`doorstop_libs/`, `doorstop_config.ini`, `.doorstop_version` and `winhttp.dll`, downloads
+the zip, unpacks it and launches the server through BepInEx's doorstop. The zip is the
+only source of truth: configs the server wrote during the last session are not kept, so
+ship any non-default config inside the zip. The start fails if the download fails or the
+zip has no BepInEx preloader or doorstop library.
+
+The URL is fetched on every start, so pointing it at a "latest" file rolls out a new pack
+on the next `/start`. Clients must run matching versions of mods that enforce a version
+check (for example Jötunn mods with `NetworkCompatibility`). Unset or empty = vanilla.
