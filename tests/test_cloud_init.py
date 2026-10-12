@@ -101,3 +101,20 @@ def test_abiotic_factor_max_players_uses_default():
         # renders successfully despite no env var -> default applied
         rendered = cloud_init.render(games.ABIOTIC_FACTOR, volume_id=_FIXED_VOLUME_ID)
     assert "MAX_SERVER_PLAYERS=6" in rendered
+
+
+def test_valheim_modpack_url_defaults_to_vanilla():
+    """Without TF_VAR_valheim_modpack_url the server starts vanilla (empty URL)."""
+    env = _env_for(games.VALHEIM)
+    assert "TF_VAR_valheim_modpack_url" not in env
+    with patch.dict(os.environ, env, clear=True):
+        rendered = cloud_init.render(games.VALHEIM)
+    assert '-e VALHEIM_MODPACK_URL="" ' in rendered
+
+
+def test_valheim_modpack_url_from_env():
+    env = _env_for(games.VALHEIM)
+    env["TF_VAR_valheim_modpack_url"] = "https://example.tld/serverpack.zip"
+    with patch.dict(os.environ, env, clear=True):
+        rendered = cloud_init.render(games.VALHEIM)
+    assert '-e VALHEIM_MODPACK_URL="https://example.tld/serverpack.zip" ' in rendered

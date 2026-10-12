@@ -145,6 +145,7 @@ runcmd:
         -e VALHEIM_SERVER_NAME=fake-valheim_server_name \
         -e VALHEIM_SERVER_WORLD=fake-valheim_server_world \
         -e VALHEIM_SERVER_PASSWORD=fake-password \
+        -e VALHEIM_MODPACK_URL="" \
         -e DISCORD_MAIN_CHANNEL_WEBHOOK=https://discord.example/api/webhooks/fake \
         --name valheim-server \
         ghcr.io/strayer/game-server-deployment-discord-bot/valheim:latest

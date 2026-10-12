@@ -145,6 +145,7 @@ runcmd:
         -e VALHEIM_SERVER_NAME={{ valheim_server_name }} \
         -e VALHEIM_SERVER_WORLD={{ valheim_server_world }} \
         -e VALHEIM_SERVER_PASSWORD={{ valheim_server_password }} \
+        -e VALHEIM_MODPACK_URL="{{ valheim_modpack_url }}" \
         -e DISCORD_MAIN_CHANNEL_WEBHOOK={{ valheim_discord_channel_webhook }} \
         --name valheim-server \
         ghcr.io/strayer/game-server-deployment-discord-bot/valheim:latest
