@@ -1,0 +1,60 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":disableRateLimiting",
+    "docker:pinDigests",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "labels": ["dependencies"],
+  // pyproject.toml keeps its ranges; a newer release inside a range is offered as a
+  // uv.lock bump, one outside it replaces the range. The default only does the latter
+  "rangeStrategy": "update-lockfile",
+  // updates should wait three days so that malware scanners and researchers get a look
+  // first; vulnerability alert PRs skip the wait and are raised immediately
+  "minimumReleaseAge": "3 days",
+  // PRs open at once with a pending renovate/stability-days status instead of waiting
+  // out of sight. Whoever merges checks the release date: the status is not a required
+  // check
+  "internalChecksFilter": "none",
+  "vulnerabilityAlerts": {
+    "enabled": true
+  },
+  "osvVulnerabilityAlerts": true,
+  // nothing merges on its own except GitHub Actions bumps (see packageRules): everything
+  // else ends up in the images that deploy from main. GitHub's auto-merge lands those
+  // once the required checks of the main ruleset are green
+  "automergeType": "pr",
+  "automergeStrategy": "squash",
+  "platformAutomerge": true,
+  "packageRules": [
+    {
+      // Actions never ship in an image, so they may land unattended
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "automerge": true,
+      // automerge does not wait for the status, so only this filter keeps the cooldown
+      "internalChecksFilter": "strict"
+    },
+    {
+      // base images are only rebuilt when main changes, so a rebuild upstream arrives as
+      // a digest PR; merging it is what picks up the OS patches
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["digest"],
+      "groupName": "Base image rebuilds"
+    },
+    { "matchUpdateTypes": ["major"], "automerge": false }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^Dockerfile\\.backup$/"
+      ],
+      "matchStrings": ["ARG RESTIC_VERSION=(?<currentValue>[\\d.]+)"],
+      "depNameTemplate": "restic/restic",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    }
+  ]
+}

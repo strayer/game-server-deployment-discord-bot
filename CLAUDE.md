@@ -94,4 +94,4 @@ Teardown (`/stop` → `provisioner.destroy`) is ordered: SSH stop the container 
 2.  Add `discord_bot/cloud_init/<game>.yaml.j2` and the matching `TF_VAR_*` entries to `job-runner.env.example`.
 3.  Add slash commands in `discord_bot/bot.py` and `start_/stop_` job functions in `discord_bot/jobs.py`.
 4.  Add the game's readiness regex to `discord_bot/server_launch_watcher.py`.
-5.  Add the game server image build to `docker/` + `Dockerfile.steamcmd` and `.github/workflows/build-image.yml`.
+5.  Add the game server image build to `docker/` + `Dockerfile.steamcmd` and `.github/workflows/build-image.yml`. Then add its `Build <game> image` job to the required checks of the `main` ruleset (and remove it there when a game is dropped or renamed, or no PR can merge).
