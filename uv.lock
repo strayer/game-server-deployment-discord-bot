@@ -669,16 +669,16 @@ wheels = [
 
 [[package]]
 name = "rq"
-version = "3.0.0"
+version = "3.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
     { name = "croniter" },
     { name = "redis" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bb/dd/386529e533eef3d67e51a430566ebb24382e664168a6612e2260b6b12243/rq-3.0.0.tar.gz", hash = "sha256:b41e39b3c36ec3faf9e2402c638a0b25fe18ebb93a1cb15193bc69694f054618", size = 803458, upload-time = "2026-10-28T15:32:57.123Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/04/75/92a599884871f749e4c998a5c64bec5c11993604e41dc41cba77cfd44dc8/rq-3.0.1.tar.gz", hash = "sha256:2a030c133ccbe71908d04f1df10e97ac2a3d482d5e0f382a0c12deb30e5ba3ec", size = 805804, upload-time = "2026-11-28T14:24:29.242Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4b/b7/bfba8789d38b7a797d4c177969d8c7eaf9dac7d2dcbda61f2ba50d17330c/rq-3.0.0-py3-none-any.whl", hash = "sha256:71b92cb7b2880e0d0ac2a462945e3f09243122f61465cec4238689d8ddf2abf4", size = 143521, upload-time = "2026-10-28T15:32:52.626Z" },
+    { url = "https://files.pythonhosted.org/packages/98/eb/8357658a39099404c1f2e0b890f26883f889065dec0ae88447b2f61f78e0/rq-3.0.1-py3-none-any.whl", hash = "sha256:e56109f4354ab4ae035d20fe1c2c5769c60bf39873f426de509e82c01f64ef44", size = 144193, upload-time = "2026-11-28T14:24:27.047Z" },
 ]
 
 [[package]]
